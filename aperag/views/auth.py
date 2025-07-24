@@ -277,13 +277,18 @@ async def register_view(
             raise HTTPException(status_code=400, detail="Invalid or expired invitation")
         if invitation.email != data.email:
             raise HTTPException(status_code=400, detail="Email does not match invitation")
-    result = await session.execute(select(User).where(User.username == data.username))
-    if result.scalars().first():
-        raise HTTPException(status_code=400, detail="Username already exists")
-    if data.email:
-        result = await session.execute(select(User).where(User.email == data.email))
+    # Check if username exists (only if provided)
+    if data.username:
+        result = await session.execute(select(User).where(User.username == data.username))
         if result.scalars().first():
-            raise HTTPException(status_code=400, detail="Email already exists")
+            raise HTTPException(status_code=400, detail="Username already exists")
+
+    # Email is now required, so always check for duplicates
+    if not data.email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    result = await session.execute(select(User).where(User.email == data.email))
+    if result.scalars().first():
+        raise HTTPException(status_code=400, detail="Email already exists")
     user_create = {
         "username": data.username,
         "email": data.email,

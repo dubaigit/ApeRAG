@@ -573,7 +573,7 @@ class User(Base):
     __tablename__ = "user"
 
     id = Column(String(24), primary_key=True, default=lambda: "user" + random_id())
-    username = Column(String(256), unique=True, nullable=False)  # Unified with other user fields
+    username = Column(String(256), unique=True, nullable=True)  # Unified with other user fields
     email = Column(String(254), unique=True, nullable=True)
     role = Column(EnumColumn(Role), nullable=False, default=Role.RO)
     hashed_password = Column(String(128), nullable=False)  # fastapi-users expects hashed_password
