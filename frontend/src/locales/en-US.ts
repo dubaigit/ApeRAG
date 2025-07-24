@@ -109,6 +109,10 @@ export default {
   'action.rename': 'Rename',
   'action.add': 'Add',
 
+  'user.or': 'or',
+  'user.signin_with_google': 'Sign in with Google',
+  'user.signin_with_github': 'Sign in with GitHub',
+
   tips: '--------------------------',
   'tips.delete.success': 'Delete successful',
   'tips.delete.failed': 'Delete failed',

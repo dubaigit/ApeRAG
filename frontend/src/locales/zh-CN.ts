@@ -108,6 +108,10 @@ export default {
   'action.rename': '重命名',
   'action.add': '添加',
 
+  'user.or': '或',
+  'user.signin_with_google': '使用 Google 登录',
+  'user.signin_with_github': '使用 GitHub 登录',
+
   tips: '--------------------------',
   'tips.delete.success': '删除成功',
   'tips.delete.failed': '删除失败',

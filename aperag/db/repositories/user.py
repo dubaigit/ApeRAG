@@ -120,6 +120,13 @@ class AsyncUserRepositoryMixin(AsyncRepositoryProtocol):
 
         return await self._execute_query(_query)
 
+    async def query_user_count(self):
+        async def _query(session):
+            stmt = select(func.count()).select_from(User).where(User.gmt_deleted.is_(None))
+            return await session.scalar(stmt)
+
+        return await self._execute_query(_query)
+
     async def query_first_user_exists(self):
         async def _query(session):
             stmt = select(User).where(User.gmt_deleted.is_(None))

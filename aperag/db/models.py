@@ -16,6 +16,7 @@ import random
 import uuid
 from enum import Enum
 
+from fastapi_users.db import SQLAlchemyBaseOAuthAccountTable
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     ARRAY,
@@ -24,6 +25,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    ForeignKey,
     Index,
     Integer,
     Numeric,
@@ -33,6 +35,7 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from aperag.utils.utils import utc_now
 
@@ -584,6 +587,7 @@ class User(Base):
     gmt_created = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     gmt_updated = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     gmt_deleted = Column(DateTime(timezone=True), nullable=True)
+    oauth_accounts: Mapped[list["OAuthAccount"]] = relationship("OAuthAccount", lazy="joined", back_populates="user")
 
     @property
     def password(self):
@@ -592,6 +596,14 @@ class User(Base):
     @password.setter
     def password(self, value):
         self.hashed_password = value
+
+
+class OAuthAccount(SQLAlchemyBaseOAuthAccountTable[str], Base):
+    __tablename__ = "oauth_account"
+
+    id = Column(String(24), primary_key=True, default=lambda: "oauth" + random_id())
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("user.id", ondelete="cascade"), nullable=False)
+    user: Mapped["User"] = relationship("User", back_populates="oauth_accounts")
 
 
 class Invitation(Base):

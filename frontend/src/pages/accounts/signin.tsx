@@ -120,6 +120,35 @@ export default () => {
           </Button>
         </Form>
 
+        <Divider>
+          <FormattedMessage id="user.or" />
+        </Divider>
+
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Button
+            icon={<i className="ri-google-fill" />}
+            block
+            onClick={() =>
+              (window.location.href = `/api/v1/auth/google/authorize?redirect_uri=${encodeURIComponent(
+                redirectUri || window.location.origin,
+              )}`)
+            }
+          >
+            <FormattedMessage id="user.signin_with_google" />
+          </Button>
+          <Button
+            icon={<i className="ri-github-fill" />}
+            block
+            onClick={() =>
+              (window.location.href = `/api/v1/auth/github/authorize?redirect_uri=${encodeURIComponent(
+                redirectUri || window.location.origin,
+              )}`)
+            }
+          >
+            <FormattedMessage id="user.signin_with_github" />
+          </Button>
+        </Space>
+
         <Divider />
         <Space
           style={{

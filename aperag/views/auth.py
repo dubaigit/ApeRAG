@@ -19,11 +19,17 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket
 from fastapi_users import BaseUserManager, FastAPIUsers
-from fastapi_users.authentication import AuthenticationBackend, CookieTransport, JWTStrategy
+from fastapi_users.authentication import (
+    AuthenticationBackend,
+    CookieTransport,
+    JWTStrategy,
+)
 from fastapi_users.db import SQLAlchemyUserDatabase
+from httpx_oauth.clients.github import GitHubOAuth2
+from httpx_oauth.clients.google import GoogleOAuth2
 
 from aperag.config import AsyncSessionDep, settings
-from aperag.db.models import ApiKey, ApiKeyStatus, Invitation, Role, User
+from aperag.db.models import ApiKey, ApiKeyStatus, Invitation, OAuthAccount, Role, User
 from aperag.db.ops import async_db_ops
 from aperag.schema import view_models
 from aperag.utils.audit_decorator import audit
@@ -37,11 +43,20 @@ COOKIE_MAX_AGE = 86400
 
 
 class UserManager(BaseUserManager[User, str]):
-    reset_password_token_secret = "SECRET"
-    verification_token_secret = "SECRET"
+    reset_password_token_secret = settings.jwt_secret
+    verification_token_secret = settings.jwt_secret
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
-        pass
+        """
+        Set the first registered user as an admin.
+        This works for both regular and OAuth registration.
+        """
+        user_count = await async_db_ops.query_user_count()
+        if user_count == 1 and user.role != Role.ADMIN:
+            user.role = Role.ADMIN
+            self.user_db.session.add(user)
+            await self.user_db.session.commit()
+            await self.user_db.session.refresh(user)
 
     def parse_id(self, value: any) -> str:
         """Parse ID from any type to str"""
@@ -51,27 +66,32 @@ class UserManager(BaseUserManager[User, str]):
 
 
 # JWT Strategy
-SECRET = "SECRET"  # TODO: Use configuration
-
-
 def get_jwt_strategy() -> JWTStrategy:
-    return JWTStrategy(secret=SECRET, lifetime_seconds=86400)
+    return JWTStrategy(secret=settings.jwt_secret, lifetime_seconds=COOKIE_MAX_AGE)
 
 
 # Transport methods
 cookie_transport = CookieTransport(cookie_name="session", cookie_max_age=COOKIE_MAX_AGE)
 
-# Authentication backends
-cookie_backend = AuthenticationBackend(
+# Authentication backend
+auth_backend = AuthenticationBackend(
     name="cookie",
     transport=cookie_transport,
     get_strategy=get_jwt_strategy,
 )
 
+# OAuth clients
+google_oauth_client = GoogleOAuth2(
+    settings.google_oauth_client_id, settings.google_oauth_client_secret
+)
+github_oauth_client = GitHubOAuth2(
+    settings.github_oauth_client_id, settings.github_oauth_client_secret
+)
+
 
 # User Database dependency
 async def get_user_db(session: AsyncSessionDep):
-    yield SQLAlchemyUserDatabase(session, User)
+    yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
 
 # UserManager dependency
@@ -82,7 +102,7 @@ async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db
 # FastAPI Users instance
 fastapi_users = FastAPIUsers[User, str](
     get_user_manager,
-    [cookie_backend],
+    [auth_backend],
 )
 
 
@@ -219,7 +239,7 @@ async def current_user(
         request.state.username = user.username
         return user
 
-    raise HTTPException(status_code=401, detail="Unauthorized")
+    return None
 
 
 async def get_current_active_user(
@@ -520,3 +540,21 @@ async def delete_user_view(
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
     await async_db_ops.delete_user(session, target)
     return {"message": "User deleted successfully"}
+
+
+# Add OAuth routes
+google_oauth_router = fastapi_users.get_oauth_router(
+    google_oauth_client,
+    auth_backend,
+    settings.jwt_secret,
+    associate_by_email=True,
+)
+github_oauth_router = fastapi_users.get_oauth_router(
+    github_oauth_client,
+    auth_backend,
+    settings.jwt_secret,
+    associate_by_email=True,
+)
+
+router.include_router(google_oauth_router, prefix="/auth/google", tags=["auth"])
+router.include_router(github_oauth_router, prefix="/auth/github", tags=["auth"])
