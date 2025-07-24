@@ -5,7 +5,7 @@ import { PageContainer } from '@/components';
 import { api } from '@/services';
 import { KeyOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Card, Divider, Form, Input, Space, Typography } from 'antd';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
   FormattedMessage,
@@ -24,6 +24,22 @@ export default () => {
   const redirectString = redirectUri
     ? '?redirectUri=' + encodeURIComponent(redirectUri)
     : '';
+  const [loginMethods, setLoginMethods] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Fetch available login methods from the backend
+    fetch('/api/v1/auth/methods')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.methods)) {
+          setLoginMethods(data.methods);
+        }
+      })
+      .catch(() => {
+        // Fallback to local if API fails
+        setLoginMethods(['local']);
+      });
+  }, []);
 
   const onFinish = useCallback(async () => {
     const values = await form.validateFields();
@@ -39,7 +55,11 @@ export default () => {
       .catch(() => {
         setLoading(false);
       });
-  }, []);
+  }, [redirectUri]);
+
+  const hasSocialLogin =
+    loginMethods.includes('google') || loginMethods.includes('github');
+  const hasLocalLogin = loginMethods.includes('local');
 
   return (
     <PageContainer
@@ -60,111 +80,128 @@ export default () => {
           <Typography.Title level={3} style={{ margin: 0 }}>
             <FormattedMessage id="user.signin" />
           </Typography.Title>
-          <Link to={`/accounts/reset${redirectString}`}>
-            <FormattedMessage id="user.forget_password" />
-          </Link>
+          {hasLocalLogin && (
+            <Link to={`/accounts/reset${redirectString}`}>
+              <FormattedMessage id="user.forget_password" />
+            </Link>
+          )}
         </Space>
         <Divider />
-        <Form
-          layout="vertical"
-          size="large"
-          form={form}
-          onFinish={onFinish}
-          autoComplete="off"
-        >
-          <Form.Item
-            required
-            name="username"
-            label={formatMessage({ id: 'user.username' })}
-            rules={[
-              {
-                required: true,
-                message: formatMessage({ id: 'user.username_required' }),
-              },
-            ]}
+
+        {hasLocalLogin && (
+          <Form
+            layout="vertical"
+            size="large"
+            form={form}
+            onFinish={onFinish}
+            autoComplete="off"
           >
-            <Input
-              prefix={
-                <Typography.Text type="secondary">
-                  <UserOutlined />
-                </Typography.Text>
-              }
-              style={{ fontSize: 'inherit' }}
-              placeholder={formatMessage({ id: 'user.username' })}
-            />
-          </Form.Item>
-          <Form.Item
-            required
-            name="password"
-            label={formatMessage({ id: 'user.password' })}
-            rules={[
-              {
-                required: true,
-                message: formatMessage({ id: 'user.password_required' }),
-              },
-            ]}
-          >
-            <Input.Password
-              style={{ fontSize: 'inherit' }}
-              prefix={
-                <Typography.Text type="secondary">
-                  <KeyOutlined />
-                </Typography.Text>
-              }
-              placeholder={formatMessage({ id: 'user.password' })}
-            />
-          </Form.Item>
+            <Form.Item
+              required
+              name="username"
+              label={formatMessage({ id: 'user.username' })}
+              rules={[
+                {
+                  required: true,
+                  message: formatMessage({ id: 'user.username_required' }),
+                },
+              ]}
+            >
+              <Input
+                prefix={
+                  <Typography.Text type="secondary">
+                    <UserOutlined />
+                  </Typography.Text>
+                }
+                style={{ fontSize: 'inherit' }}
+                placeholder={formatMessage({ id: 'user.username' })}
+              />
+            </Form.Item>
+            <Form.Item
+              required
+              name="password"
+              label={formatMessage({ id: 'user.password' })}
+              rules={[
+                {
+                  required: true,
+                  message: formatMessage({ id: 'user.password_required' }),
+                },
+              ]}
+            >
+              <Input.Password
+                style={{ fontSize: 'inherit' }}
+                prefix={
+                  <Typography.Text type="secondary">
+                    <KeyOutlined />
+                  </Typography.Text>
+                }
+                placeholder={formatMessage({ id: 'user.password' })}
+              />
+            </Form.Item>
 
-          <Button loading={loading} htmlType="submit" block type="primary">
-            <FormattedMessage id="user.signin" />
-          </Button>
-        </Form>
+            <Button loading={loading} htmlType="submit" block type="primary">
+              <FormattedMessage id="user.signin" />
+            </Button>
+          </Form>
+        )}
 
-        <Divider>
-          <FormattedMessage id="user.or" />
-        </Divider>
+        {hasLocalLogin && hasSocialLogin && (
+          <Divider>
+            <FormattedMessage id="user.or" />
+          </Divider>
+        )}
 
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Button
-            icon={<i className="ri-google-fill" />}
-            block
-            onClick={() =>
-              (window.location.href = `/api/v1/auth/google/authorize?redirect_uri=${encodeURIComponent(
-                redirectUri || window.location.origin,
-              )}`)
-            }
-          >
-            <FormattedMessage id="user.signin_with_google" />
-          </Button>
-          <Button
-            icon={<i className="ri-github-fill" />}
-            block
-            onClick={() =>
-              (window.location.href = `/api/v1/auth/github/authorize?redirect_uri=${encodeURIComponent(
-                redirectUri || window.location.origin,
-              )}`)
-            }
-          >
-            <FormattedMessage id="user.signin_with_github" />
-          </Button>
-        </Space>
+        {hasSocialLogin && (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            {loginMethods.includes('google') && (
+              <Button
+                icon={<i className="ri-google-fill" />}
+                block
+                onClick={() =>
+                  (window.location.href = `/api/v1/auth/google/authorize?redirect_uri=${encodeURIComponent(
+                    redirectUri || window.location.origin,
+                  )}`)
+                }
+              >
+                <FormattedMessage id="user.signin_with_google" />
+              </Button>
+            )}
+            {loginMethods.includes('github') && (
+              <Button
+                icon={<i className="ri-github-fill" />}
+                block
+                onClick={() =>
+                  (window.location.href = `/api/v1/auth/github/authorize?redirect_uri=${encodeURIComponent(
+                    redirectUri || window.location.origin,
+                  )}`)
+                }
+              >
+                <FormattedMessage id="user.signin_with_github" />
+              </Button>
+            )}
+          </Space>
+        )}
 
-        <Divider />
-        <Space
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginTop: 4,
-          }}
-        >
-          <Typography.Text type="secondary">
-            <FormattedMessage id="user.not_have_account" />
-          </Typography.Text>
+        {hasLocalLogin && (
+          <>
+            <Divider />
+            <Space
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                marginTop: 4,
+              }}
+            >
+              <Typography.Text type="secondary">
+                <FormattedMessage id="user.not_have_account" />
+              </Typography.Text>
 
-          <Link to={`/accounts/signup${redirectString}`}>
-            <FormattedMessage id="user.signup" />
-          </Link>
-        </Space>
+              <Link to={`/accounts/signup${redirectString}`}>
+                <FormattedMessage id="user.signup" />
+              </Link>
+            </Space>
+          </>
+        )}
       </Card>
     </PageContainer>
   );

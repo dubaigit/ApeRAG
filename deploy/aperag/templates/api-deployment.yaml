@@ -44,6 +44,16 @@ spec:
                   fieldPath: status.hostIP
             - name: PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION
               value: python
+            - name: JWT_SECRET
+              value: {{ .Values.api.env.JWT_SECRET | quote }}
+            - name: GOOGLE_OAUTH_CLIENT_ID
+              value: {{ .Values.api.env.GOOGLE_OAUTH_CLIENT_ID | quote }}
+            - name: GOOGLE_OAUTH_CLIENT_SECRET
+              value: {{ .Values.api.env.GOOGLE_OAUTH_CLIENT_SECRET | quote }}
+            - name: GITHUB_OAUTH_CLIENT_ID
+              value: {{ .Values.api.env.GITHUB_OAUTH_CLIENT_ID | quote }}
+            - name: GITHUB_OAUTH_CLIENT_SECRET
+              value: {{ .Values.api.env.GITHUB_OAUTH_CLIENT_SECRET | quote }}
             {{- if .Values.postgres.enabled }}
             - name: POSTGRES_HOST
               value: {{ .Values.postgres.POSTGRES_HOST | quote }}
