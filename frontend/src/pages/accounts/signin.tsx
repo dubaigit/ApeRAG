@@ -157,11 +157,21 @@ export default () => {
               <Button
                 icon={<i className="ri-google-fill" />}
                 block
-                onClick={() =>
-                  (window.location.href = `/api/v1/auth/google/authorize?redirect_uri=${encodeURIComponent(
-                    redirectUri || window.location.origin,
-                  )}`)
-                }
+                onClick={async () => {
+                  try {
+                    const response = await fetch(
+                      `/api/v1/auth/google/authorize?redirect_uri=${encodeURIComponent(
+                        redirectUri || window.location.origin,
+                      )}`,
+                    );
+                    const data = await response.json();
+                    if (data.authorization_url) {
+                      window.location.href = data.authorization_url;
+                    }
+                  } catch (error) {
+                    console.error('Google OAuth error:', error);
+                  }
+                }}
               >
                 <FormattedMessage id="user.signin_with_google" />
               </Button>
@@ -170,11 +180,21 @@ export default () => {
               <Button
                 icon={<i className="ri-github-fill" />}
                 block
-                onClick={() =>
-                  (window.location.href = `/api/v1/auth/github/authorize?redirect_uri=${encodeURIComponent(
-                    redirectUri || window.location.origin,
-                  )}`)
-                }
+                onClick={async () => {
+                  try {
+                    const response = await fetch(
+                      `/api/v1/auth/github/authorize?redirect_uri=${encodeURIComponent(
+                        redirectUri || window.location.origin,
+                      )}`,
+                    );
+                    const data = await response.json();
+                    if (data.authorization_url) {
+                      window.location.href = data.authorization_url;
+                    }
+                  } catch (error) {
+                    console.error('GitHub OAuth error:', error);
+                  }
+                }}
               >
                 <FormattedMessage id="user.signin_with_github" />
               </Button>
