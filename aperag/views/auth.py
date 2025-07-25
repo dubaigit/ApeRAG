@@ -229,12 +229,15 @@ if settings.google_oauth_client_id and settings.google_oauth_client_secret:
     google_oauth_client = GoogleOAuth2(
         settings.google_oauth_client_id, settings.google_oauth_client_secret
     )
+    # Set redirect_url to frontend OAuth callback page
+    google_redirect_url = settings.oauth_redirect_url
     google_oauth_router = fastapi_users.get_oauth_router(
         google_oauth_client,
         auth_backend,
         settings.jwt_secret,
         associate_by_email=True,
         is_verified_by_default=True,
+        redirect_url=google_redirect_url,
     )
     router.include_router(google_oauth_router, prefix="/auth/google", tags=["auth"])
 
@@ -242,12 +245,15 @@ if settings.github_oauth_client_id and settings.github_oauth_client_secret:
     github_oauth_client = GitHubOAuth2(
         settings.github_oauth_client_id, settings.github_oauth_client_secret
     )
+    # Set redirect_url to frontend OAuth callback page
+    github_redirect_url = settings.oauth_redirect_url
     github_oauth_router = fastapi_users.get_oauth_router(
         github_oauth_client,
         auth_backend,
         settings.jwt_secret,
         associate_by_email=True,
         is_verified_by_default=True,
+        redirect_url=github_redirect_url,
     )
     router.include_router(github_oauth_router, prefix="/auth/github", tags=["auth"])
 

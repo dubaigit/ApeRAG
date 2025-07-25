@@ -88,6 +88,7 @@ class Config(BaseSettings):
     google_oauth_client_secret: str = Field("", alias="GOOGLE_OAUTH_CLIENT_SECRET")
     github_oauth_client_id: str = Field("", alias="GITHUB_OAUTH_CLIENT_ID")
     github_oauth_client_secret: str = Field("", alias="GITHUB_OAUTH_CLIENT_SECRET")
+    oauth_redirect_url: str = Field("http://127.0.0.1:3000/web/oauth-callback", alias="OAUTH_REDIRECT_URL")
     auth0_domain: str = Field("aperag-dev.auting.cn", alias="AUTH0_DOMAIN")
     auth0_client_id: str = Field("", alias="AUTH0_CLIENT_ID")
     authing_domain: str = Field("aperag.authing.cn", alias="AUTHING_DOMAIN")
