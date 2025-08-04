@@ -140,6 +140,14 @@ paths:
   /users/{user_id}:
     $ref: './paths/auth.yaml#/deleteUser'
 
+  # quotas
+  /quotas:
+    $ref: './paths/quotas.yaml#/quotas'
+  /quotas/{user_id}:
+    $ref: './paths/quotas.yaml#/quota'
+  /quotas/{user_id}/recalculate:
+    $ref: './paths/quotas.yaml#/quota_recalculate'
+
   # web services
   /web/search:
     $ref: './paths/web.yaml#/webSearch'

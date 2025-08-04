@@ -39,6 +39,7 @@ from aperag.index.manager import document_index_manager
 from aperag.objectstore.base import get_async_object_store
 from aperag.schema import view_models
 from aperag.schema.view_models import Chunk, DocumentList, DocumentPreview, VisionChunk
+from aperag.service.quota_service import QuotaService
 from aperag.utils.constant import QuotaType
 from aperag.utils.uncompress import SUPPORTED_COMPRESSED_EXTENSIONS
 from aperag.utils.utils import generate_vector_db_collection_name, utc_now
@@ -207,12 +208,16 @@ class DocumentService:
         if collection.status != db_models.CollectionStatus.ACTIVE:
             raise CollectionInactiveException(collection_id)
 
-        if settings.max_document_count:
-            document_limit = await self.db_ops.query_user_quota(user, QuotaType.MAX_DOCUMENT_COUNT)
-            if document_limit is None:
-                document_limit = settings.max_document_count
-            if await self.db_ops.query_documents_count(user, collection_id) >= document_limit:
-                raise QuotaExceededException("document", document_limit)
+        # Use QuotaService to check and consume document quotas
+        from aperag.db.ops import get_db_session
+        
+        with get_db_session() as db:
+            # Check both total document quota and per-collection quota
+            if not QuotaService.check_quota_available(user, "max_document_count", len(files), db):
+                raise QuotaExceededException("document", "max_document_count quota exceeded")
+            
+            if not QuotaService.check_quota_available(user, "max_document_count_per_collection", len(files), db):
+                raise QuotaExceededException("document", "max_document_count_per_collection quota exceeded")
 
         supported_file_extensions = DocParser().supported_extensions()
         supported_file_extensions += SUPPORTED_COMPRESSED_EXTENSIONS

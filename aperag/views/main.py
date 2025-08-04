@@ -43,10 +43,14 @@ from aperag.utils.audit_decorator import audit
 
 # Import authentication dependencies
 from aperag.views.auth import UserManager, authenticate_websocket_user, current_user, get_user_manager
+from aperag.views.quota import router as quota_router
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Include quota routes
+router.include_router(quota_router, tags=["quotas"])
 
 
 @router.get("/prompt-templates", tags=["templates"])

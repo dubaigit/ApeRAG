@@ -32,6 +32,7 @@ from aperag.schema.view_models import (
     SearchResultList,
 )
 from aperag.service.collection_summary_service import collection_summary_service
+from aperag.service.quota_service import QuotaService
 from aperag.utils.constant import QuotaType
 from aperag.views.utils import validate_source_connect_config
 from config.celery_tasks import collection_delete_task, collection_init_task
@@ -69,33 +70,42 @@ class CollectionService:
         if not is_validate:
             raise ValidationException(error_msg)
 
-        # Check quota limit on collection
-        if settings.max_collection_count:
-            collection_limit = await self.db_ops.query_user_quota(user, QuotaType.MAX_COLLECTION_COUNT)
-            if collection_limit is None:
-                collection_limit = settings.max_collection_count
-            if collection_limit and await self.db_ops.query_collections_count(user) >= collection_limit:
-                raise QuotaExceededException("collection", collection_limit)
+        # Use QuotaService to consume quota atomically
+        # This will check and consume quota in a single transaction
+        from aperag.db.ops import get_db_session
+        
+        for db in get_db_session():
+            try:
+                # Consume collection quota
+                QuotaService.consume_quota(user, "max_collection_count", 1, db)
+                
+                # Direct call to repository method, which handles its own transaction
+                config_str = dumpCollectionConfig(collection_config) if collection.config is not None else None
 
-        # Direct call to repository method, which handles its own transaction
-        config_str = dumpCollectionConfig(collection_config) if collection.config is not None else None
+                instance = await self.db_ops.create_collection(
+                    user=user,
+                    title=collection.title,
+                    description=collection.description,
+                    collection_type=collection.type,
+                    config=config_str,
+                )
 
-        instance = await self.db_ops.create_collection(
-            user=user,
-            title=collection.title,
-            description=collection.description,
-            collection_type=collection.type,
-            config=config_str,
-        )
+                if collection.config.enable_summary:
+                    await collection_summary_service.trigger_collection_summary_generation(instance)
 
-        if collection.config.enable_summary:
-            await collection_summary_service.trigger_collection_summary_generation(instance)
+                # Initialize collection based on type
+                document_user_quota = await self.db_ops.query_user_quota(user, QuotaType.MAX_DOCUMENT_COUNT)
+                collection_init_task.delay(instance.id, document_user_quota)
 
-        # Initialize collection based on type
-        document_user_quota = await self.db_ops.query_user_quota(user, QuotaType.MAX_DOCUMENT_COUNT)
-        collection_init_task.delay(instance.id, document_user_quota)
-
-        return await self.build_collection_response(instance)
+                return await self.build_collection_response(instance)
+                
+            except Exception as e:
+                # If collection creation fails, release the consumed quota
+                try:
+                    QuotaService.release_quota(user, "max_collection_count", 1, db)
+                except:
+                    pass  # Ignore errors during cleanup
+                raise e
 
     async def list_collections(self, user: str) -> view_models.CollectionList:
         collections = await self.db_ops.query_collections([user])
@@ -167,6 +177,14 @@ class CollectionService:
         deleted_instance = await self.db_ops.delete_collection_by_id(user, collection_id)
 
         if deleted_instance:
+            # Release collection quota
+            from aperag.db.ops import get_db_session
+            try:
+                with get_db_session() as db:
+                    QuotaService.release_quota(user, "max_collection_count", 1, db)
+            except Exception:
+                pass  # Ignore quota release errors during deletion
+            
             # Clean up related resources
             collection_delete_task.delay(collection_id)
             return await self.build_collection_response(deleted_instance)

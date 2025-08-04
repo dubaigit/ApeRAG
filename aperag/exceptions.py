@@ -208,6 +208,13 @@ class PermissionDeniedError(BusinessException):
         super().__init__(ErrorCode.FORBIDDEN, message or "Permission denied")
 
 
+class NotFoundException(BusinessException):
+    """Not found exception"""
+
+    def __init__(self, message: str):
+        super().__init__(ErrorCode.RESOURCE_NOT_FOUND, message)
+
+
 # Convenience functions for common exceptions
 def not_found(resource_type: str, resource_id: str = None) -> ResourceNotFoundException:
     """Create a resource not found exception"""

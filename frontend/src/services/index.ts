@@ -1,4 +1,4 @@
-import { Configuration, DefaultApi, GraphApi } from '@/api';
+import { Configuration, DefaultApi, GraphApi, QuotasApi } from '@/api';
 import { getAuthorizationHeader } from '@/models/user';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -52,3 +52,4 @@ const requestConfiguration = new Configuration();
 
 export const api = new DefaultApi(requestConfiguration, '/api/v1', request);
 export const graphApi = new GraphApi(requestConfiguration, '/api/v1', request);
+export const quotasApi = new QuotasApi(requestConfiguration, '/api/v1', request);

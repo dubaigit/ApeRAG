@@ -364,10 +364,19 @@ class UserQuota(Base):
 
     user = Column(String(256), primary_key=True)
     key = Column(String(256), primary_key=True)
-    value = Column(Integer, default=0, nullable=False)
+    quota_limit = Column(Integer, default=0, nullable=False)  # Renamed from 'value' for clarity
+    current_usage = Column(Integer, default=0, nullable=False)  # New field to track current usage
     gmt_created = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     gmt_updated = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     gmt_deleted = Column(DateTime(timezone=True), nullable=True)
+
+    def is_quota_exceeded(self, additional_usage: int = 1) -> bool:
+        """Check if adding additional usage would exceed the quota limit"""
+        return (self.current_usage + additional_usage) > self.quota_limit
+
+    def can_consume(self, amount: int = 1) -> bool:
+        """Check if the specified amount can be consumed without exceeding quota"""
+        return not self.is_quota_exceeded(amount)
 
 
 class Chat(Base):
