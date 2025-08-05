@@ -56,6 +56,7 @@ def _convert_quota_dict_to_list(quota_dict: dict) -> List[QuotaInfo]:
 async def get_quotas(
     user_id: str = Query(None, description="User ID to get quotas for (admin only)"),
     all_users: bool = Query(False, description="Get quotas for all users (admin only)"),
+    search: str = Query(None, description="Search term for username, email, or user ID (admin only)"),
     current_user: User = Depends(current_user)
 ):
     """Get quota information for the current user or all users (admin only)"""
@@ -65,7 +66,7 @@ async def get_quotas(
             if current_user.role != Role.ADMIN:
                 raise HTTPException(status_code=403, detail="Admin access required")
             
-            all_user_quotas = await quota_service.get_all_users_quotas()
+            all_user_quotas = await quota_service.get_all_users_quotas(search_term=search)
             
             items = []
             for user_quota in all_user_quotas:

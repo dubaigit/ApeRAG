@@ -52,14 +52,26 @@ class QuotaService:
         
         return await self.db_ops._execute_query(_query)
 
-    async def get_all_users_quotas(self) -> List[Dict]:
+    async def get_all_users_quotas(self, search_term: str = None) -> List[Dict]:
         """Get quotas for all users (admin only)."""
         async def _query(session):
             from aperag.db.models import User, UserQuota
-            from sqlalchemy import select
+            from sqlalchemy import select, or_
             
-            # Get all users
+            # Build query for users
             stmt = select(User).where(User.gmt_deleted.is_(None))
+            
+            # Add search filter if provided
+            if search_term and search_term.strip():
+                search_value = search_term.strip()
+                stmt = stmt.where(
+                    or_(
+                        User.username == search_value,
+                        User.email == search_value,
+                        User.id == search_value
+                    )
+                )
+            
             result = await session.execute(stmt)
             users = result.scalars().all()
             

@@ -19,6 +19,13 @@ quotas:
         schema:
           type: boolean
           default: false
+      - name: search
+        in: query
+        description: Search term for username, email, or user ID (admin only)
+        required: false
+        schema:
+          type: string
+          example: "john"
     responses:
       '200':
         description: Quota information retrieved successfully

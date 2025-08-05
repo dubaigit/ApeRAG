@@ -42,10 +42,11 @@ export const QuotasApiAxiosParamCreator = function (configuration?: Configuratio
          * @summary Get user quotas
          * @param {string} [userId] User ID to get quotas for (admin only, defaults to current user)
          * @param {boolean} [allUsers] Get quotas for all users (admin only)
+         * @param {string} [search] Search term for username, email, or user ID (admin only)
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        quotasGet: async (userId?: string, allUsers?: boolean, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        quotasGet: async (userId?: string, allUsers?: boolean, search?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/quotas`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -64,6 +65,10 @@ export const QuotasApiAxiosParamCreator = function (configuration?: Configuratio
 
             if (allUsers !== undefined) {
                 localVarQueryParameter['all_users'] = allUsers;
+            }
+
+            if (search !== undefined) {
+                localVarQueryParameter['search'] = search;
             }
 
 
@@ -166,11 +171,12 @@ export const QuotasApiFp = function(configuration?: Configuration) {
          * @summary Get user quotas
          * @param {string} [userId] User ID to get quotas for (admin only, defaults to current user)
          * @param {boolean} [allUsers] Get quotas for all users (admin only)
+         * @param {string} [search] Search term for username, email, or user ID (admin only)
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async quotasGet(userId?: string, allUsers?: boolean, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<QuotasGet200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.quotasGet(userId, allUsers, options);
+        async quotasGet(userId?: string, allUsers?: boolean, search?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<QuotasGet200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.quotasGet(userId, allUsers, search, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['QuotasApi.quotasGet']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -220,7 +226,7 @@ export const QuotasApiFactory = function (configuration?: Configuration, basePat
          * @throws {RequiredError}
          */
         quotasGet(requestParameters: QuotasApiQuotasGetRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<QuotasGet200Response> {
-            return localVarFp.quotasGet(requestParameters.userId, requestParameters.allUsers, options).then((request) => request(axios, basePath));
+            return localVarFp.quotasGet(requestParameters.userId, requestParameters.allUsers, requestParameters.search, options).then((request) => request(axios, basePath));
         },
         /**
          * Update quota limit for a specific user (admin only)
@@ -302,6 +308,13 @@ export interface QuotasApiQuotasGetRequest {
      * @memberof QuotasApiQuotasGet
      */
     readonly allUsers?: boolean
+
+    /**
+     * Search term for username, email, or user ID (admin only)
+     * @type {string}
+     * @memberof QuotasApiQuotasGet
+     */
+    readonly search?: string
 }
 
 /**
@@ -355,7 +368,7 @@ export class QuotasApi extends BaseAPI implements QuotasApiInterface {
      * @memberof QuotasApi
      */
     public quotasGet(requestParameters: QuotasApiQuotasGetRequest = {}, options?: RawAxiosRequestConfig) {
-        return QuotasApiFp(this.configuration).quotasGet(requestParameters.userId, requestParameters.allUsers, options).then((request) => request(this.axios, this.basePath));
+        return QuotasApiFp(this.configuration).quotasGet(requestParameters.userId, requestParameters.allUsers, requestParameters.search, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

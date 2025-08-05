@@ -1,4 +1,4 @@
-import { QuotaInfo, UserQuotaInfo, UserQuotaList, QuotaUpdateRequest } from '@/api';
+import { QuotaInfo, UserQuotaInfo, UserQuotaList } from '@/api';
 import { PageContainer, PageHeader, RefreshButton } from '@/components';
 import { quotasApi } from '@/services';
 import { EditOutlined, ReloadOutlined, SettingOutlined, SearchOutlined, ClearOutlined } from '@ant-design/icons';
@@ -82,22 +82,20 @@ export default () => {
     setSearchedUserQuota(undefined);
     
     try {
-      // Search for user by exact username, email, or user ID
-      const res = await quotasApi.quotasGet({ allUsers: true });
+      // Use backend search functionality
+      const res = await quotasApi.quotasGet({ allUsers: true, search: searchTerm });
       const quotaList = res.data as UserQuotaList;
       
-      // Find exact matching user
-      const foundUser = quotaList.items.find(user => 
-        user.username === searchTerm ||
-        user.email === searchTerm ||
-        user.user_id === searchTerm
-      );
-
-      if (foundUser) {
-        setSearchedUserQuota(foundUser);
-      } else {
+      if (quotaList.items.length === 1) {
+        // Found exactly one user
+        setSearchedUserQuota(quotaList.items[0]);
+      } else if (quotaList.items.length === 0) {
+        // No users found
         message.warning(formatMessage({ id: 'quota.user_not_found' }));
         setSearchedUserQuota(undefined);
+      } else {
+        // Multiple users found (shouldn't happen with exact search, but just in case)
+        setSearchedUserQuota(quotaList.items[0]);
       }
     } catch (error) {
       message.error(formatMessage({ id: 'quota.search_error' }));
@@ -230,29 +228,6 @@ export default () => {
     }
   };
 
-  const renderQuotaCard = (quota: QuotaInfo) => {
-    const percentage = quota.quota_limit > 0 ? (quota.current_usage / quota.quota_limit) * 100 : 0;
-    const status = percentage >= 100 ? 'exception' : percentage >= 80 ? 'active' : 'normal';
-
-    return (
-      <Card key={quota.quota_type} size="small" style={{ marginBottom: 8 }}>
-        <div style={{ marginBottom: 8 }}>
-          <Typography.Text strong>{getQuotaTypeName(quota.quota_type)}</Typography.Text>
-        </div>
-        <Progress
-          percent={Math.min(percentage, 100)}
-          status={status}
-          format={() => `${quota.current_usage}/${quota.quota_limit}`}
-        />
-        <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
-          <FormattedMessage 
-            id="quota.remaining" 
-            values={{ remaining: quota.remaining }}
-          />
-        </div>
-      </Card>
-    );
-  };
 
   const userQuotaColumns: TableProps<QuotaInfo>['columns'] = [
     {
@@ -375,7 +350,6 @@ export default () => {
       !!currentUserQuota;
     
     const displayUser = searchedUserQuota || currentUserQuota;
-    const isSearchResult = !!searchedUserQuota;
 
     return (
       <div>
