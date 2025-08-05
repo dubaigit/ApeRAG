@@ -213,6 +213,63 @@ class NotFoundException(BusinessException):
 
     def __init__(self, message: str):
         super().__init__(ErrorCode.RESOURCE_NOT_FOUND, message)
+# Marketplace related exceptions
+class MarketplaceError(BusinessException):
+    """Base class for marketplace-related errors"""
+
+    pass
+
+
+class CollectionNotPublishedError(MarketplaceError):
+    """Exception raised when trying to access an unpublished collection"""
+
+    def __init__(self, collection_id: str = None):
+        message = "Collection is not published to marketplace"
+        if collection_id:
+            message += f" (ID: {collection_id})"
+        super().__init__(ErrorCode.INVALID_PARAMETER, message)
+
+
+class AlreadySubscribedError(MarketplaceError):
+    """Exception raised when user tries to subscribe to an already subscribed collection"""
+
+    def __init__(self, collection_id: str = None):
+        message = "Already subscribed to this collection"
+        if collection_id:
+            message += f" (ID: {collection_id})"
+        super().__init__(ErrorCode.INVALID_PARAMETER, message)
+
+
+class SubscriptionNotFoundError(MarketplaceError):
+    """Exception raised when subscription is not found"""
+
+    def __init__(self, collection_id: str = None):
+        message = "Subscription not found"
+        if collection_id:
+            message += f" for collection (ID: {collection_id})"
+        super().__init__(ErrorCode.NOT_FOUND, message)
+
+
+class SelfSubscriptionError(MarketplaceError):
+    """Exception raised when user tries to subscribe to their own collection"""
+
+    def __init__(self, collection_id: str = None):
+        message = "Cannot subscribe to your own collection"
+        if collection_id:
+            message += f" (ID: {collection_id})"
+        super().__init__(ErrorCode.INVALID_PARAMETER, message)
+
+
+class CollectionMarketplaceAccessDeniedError(MarketplaceError):
+    """Exception raised when user doesn't have subscription access to marketplace collection"""
+
+    def __init__(self, collection_id: str = None, reason: str = None):
+        message = "Access denied to marketplace collection"
+        if collection_id:
+            message += f" (ID: {collection_id})"
+        if reason:
+            message += f" - {reason}"
+        super().__init__(ErrorCode.FORBIDDEN, message)
 
 
 # Convenience functions for common exceptions

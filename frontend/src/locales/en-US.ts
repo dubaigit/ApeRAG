@@ -45,6 +45,10 @@ export default {
 
   // Common
   'common.search': 'Search',
+  'common.search.placeholder': 'Search collections...',
+  'common.search.no.results': 'No matching results found',
+  'common.search.try.different.keywords': 'Please try different keywords',
+  'common.total.items': 'Total {total} items',
   'common.actions': 'Actions',
   'common.detail': 'Detail',
   'common.system': 'System',

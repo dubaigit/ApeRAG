@@ -45,6 +45,10 @@ export default {
 
   // Common
   'common.search': '搜索',
+  'common.search.placeholder': '搜索知识库...',
+  'common.search.no.results': '没有找到匹配的结果',
+  'common.search.try.different.keywords': '请尝试使用不同的关键词',
+  'common.total.items': '共 {total} 个项目',
   'common.actions': '操作',
   'common.detail': '详情',
   'common.system': '系统',

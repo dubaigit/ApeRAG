@@ -15,27 +15,27 @@
 
 // May contain unused imports in some cases
 // @ts-ignore
-import type { Collection } from './collection';
+import type { CollectionView } from './collection-view';
 // May contain unused imports in some cases
 // @ts-ignore
 import type { PageResult } from './page-result';
 
 /**
- * A list of collections
+ * A list of collection views
  * @export
- * @interface CollectionList
+ * @interface CollectionViewList
  */
-export interface CollectionList {
+export interface CollectionViewList {
     /**
      * 
-     * @type {Array<Collection>}
-     * @memberof CollectionList
+     * @type {Array<CollectionView>}
+     * @memberof CollectionViewList
      */
-    'items'?: Array<Collection>;
+    'items'?: Array<CollectionView>;
     /**
      * 
      * @type {PageResult}
-     * @memberof CollectionList
+     * @memberof CollectionViewList
      */
     'pageResult'?: PageResult;
 }

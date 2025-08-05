@@ -287,6 +287,8 @@ export default () => {
         topk: 5,
         similarity: 0.7,
       },
+      save_to_history: true,
+      rerank: false,
     });
   }, []);
 

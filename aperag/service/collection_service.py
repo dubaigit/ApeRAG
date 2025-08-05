@@ -33,6 +33,7 @@ from aperag.schema.view_models import (
 )
 from aperag.service.collection_summary_service import collection_summary_service
 from aperag.service.quota_service import QuotaService
+from aperag.service.marketplace_collection_service import marketplace_collection_service
 from aperag.utils.constant import QuotaType
 from aperag.views.utils import validate_source_connect_config
 from config.celery_tasks import collection_delete_task, collection_init_task
@@ -107,12 +108,90 @@ class CollectionService:
                     pass  # Ignore errors during cleanup
                 raise e
 
-    async def list_collections(self, user: str) -> view_models.CollectionList:
-        collections = await self.db_ops.query_collections([user])
-        response = []
-        for collection in collections:
-            response.append(await self.build_collection_response(collection))
-        return view_models.CollectionList(items=response)
+    async def list_collections_view(
+        self, user_id: str, include_subscribed: bool = True, page: int = 1, page_size: int = 20
+    ) -> view_models.CollectionViewList:
+        """
+        Get user's collection list (lightweight view)
+
+        Args:
+            user_id: User ID
+            include_subscribed: Whether to include subscribed collections, default True
+            page: Page number
+            page_size: Page size
+        """
+        items = []
+
+        # 1. Get user's owned collections with marketplace info
+        owned_collections_data = await self.db_ops.query_collections_with_marketplace_info(user_id)
+
+        for row in owned_collections_data:
+            is_published = row.marketplace_status == "PUBLISHED"
+            items.append(
+                view_models.CollectionView(
+                    id=row.id,
+                    title=row.title,
+                    description=row.description,
+                    type=row.type,
+                    status=row.status,
+                    created=row.gmt_created,
+                    updated=row.gmt_updated,
+                    is_published=is_published,
+                    published_at=row.published_at if is_published else None,
+                    owner_user_id=row.user,
+                    owner_username=row.owner_username,
+                    subscription_id=None,  # Own collection, subscription_id is None
+                    subscribed_at=None,
+                )
+            )
+
+        # 2. Get subscribed collections if needed (optimized - no N+1 queries)
+        if include_subscribed:
+            try:
+                # Get subscribed collections data with all needed fields in one query
+                subscribed_collections_data, _ = await self.db_ops.list_user_subscribed_collections(
+                    user_id,
+                    page=1,
+                    page_size=1000,  # Get all subscriptions for now
+                )
+
+                for data in subscribed_collections_data:
+                    is_published = data["marketplace_status"] == "PUBLISHED"
+                    items.append(
+                        view_models.CollectionView(
+                            id=data["id"],
+                            title=data["title"],
+                            description=data["description"],
+                            type=data["type"],
+                            status=data["status"],
+                            created=data["gmt_created"],
+                            updated=data["gmt_updated"],
+                            is_published=is_published,
+                            published_at=data["published_at"] if is_published else None,
+                            owner_user_id=data["owner_user_id"],
+                            owner_username=data["owner_username"],
+                            subscription_id=data["subscription_id"],
+                            subscribed_at=data["gmt_subscribed"],
+                        )
+                    )
+            except Exception as e:
+                # If getting subscriptions fails, log and continue with owned collections
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to get subscribed collections for user {user_id}: {e}")
+
+        # 3. Sort by update time
+        items.sort(key=lambda x: x.updated or x.created, reverse=True)
+
+        # 4. Apply pagination
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_items = items[start_idx:end_idx]
+
+        return view_models.CollectionViewList(
+            items=paginated_items, pageResult=view_models.PageResult(total=len(items), page=page, page_size=page_size)
+        )
 
     async def get_collection(self, user: str, collection_id: str) -> view_models.Collection:
         from aperag.exceptions import CollectionNotFoundException
@@ -196,9 +275,22 @@ class CollectionService:
     ) -> view_models.SearchResult:
         from aperag.exceptions import CollectionNotFoundException
 
+        # Try to find collection as owner first
         collection = await self.db_ops.query_collection(user, collection_id)
+        search_user_id = user  # Default to current user for search operations
+
         if not collection:
-            raise CollectionNotFoundException(collection_id)
+            # If not found as owner, check if it's a marketplace collection
+            try:
+                marketplace_info = await marketplace_collection_service._check_marketplace_access(user, collection_id)
+                # Use owner's user_id for search operations in marketplace collections
+                search_user_id = marketplace_info["owner_user_id"]
+                collection = await self.db_ops.query_collection(search_user_id, collection_id)
+                if not collection:
+                    raise CollectionNotFoundException(collection_id)
+            except Exception:
+                # If marketplace access also fails, raise original not found error
+                raise CollectionNotFoundException(collection_id)
 
         # Build flow for search execution
         nodes = {}
@@ -283,7 +375,8 @@ class CollectionService:
             edges=edges,
         )
         engine = FlowEngine()
-        initial_data = {"query": query, "user": user}
+        # Use search_user_id for flow execution (owner's ID for marketplace collections)
+        initial_data = {"query": query, "user": search_user_id}
         result, _ = await engine.execute_flow(flow, initial_data)
 
         if not result:
@@ -304,26 +397,40 @@ class CollectionService:
                 )
             )
 
-        record = await self.db_ops.create_search(
-            user=user,
-            collection_id=collection_id,
-            query=data.query,
-            vector_search=data.vector_search.model_dump() if data.vector_search else None,
-            fulltext_search=data.fulltext_search.model_dump() if data.fulltext_search else None,
-            graph_search=data.graph_search.model_dump() if data.graph_search else None,
-            summary_search=data.summary_search.model_dump() if data.summary_search else None,
-            items=[item.model_dump() for item in items],
-        )
-        return SearchResult(
-            id=record.id,
-            query=record.query,
-            vector_search=record.vector_search,
-            fulltext_search=record.fulltext_search,
-            graph_search=record.graph_search,
-            summary_search=record.summary_search,
-            items=items,
-            created=record.gmt_created.isoformat(),
-        )
+        # Save to database only if save_to_history is True
+        if data.save_to_history:
+            record = await self.db_ops.create_search(
+                user=user,
+                collection_id=collection_id,
+                query=data.query,
+                vector_search=data.vector_search.model_dump() if data.vector_search else None,
+                fulltext_search=data.fulltext_search.model_dump() if data.fulltext_search else None,
+                graph_search=data.graph_search.model_dump() if data.graph_search else None,
+                summary_search=data.summary_search.model_dump() if data.summary_search else None,
+                items=[item.model_dump() for item in items],
+            )
+            return SearchResult(
+                id=record.id,
+                query=record.query,
+                vector_search=record.vector_search,
+                fulltext_search=record.fulltext_search,
+                graph_search=record.graph_search,
+                summary_search=record.summary_search,
+                items=items,
+                created=record.gmt_created.isoformat(),
+            )
+        else:
+            # Return search result without saving to database
+            return SearchResult(
+                id=None,  # No ID since not saved
+                query=data.query,
+                vector_search=data.vector_search,
+                fulltext_search=data.fulltext_search,
+                graph_search=data.graph_search,
+                summary_search=data.summary_search,
+                items=items,
+                created=None,  # No creation time since not saved
+            )
 
     async def list_searches(self, user: str, collection_id: str) -> view_models.SearchResultList:
         from aperag.exceptions import CollectionNotFoundException

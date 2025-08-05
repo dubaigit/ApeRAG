@@ -116,6 +116,14 @@ class AsyncUserRepositoryMixin(AsyncRepositoryProtocol):
 
         return await self._execute_query(_query)
 
+    async def query_user_by_id(self, user_id: str):
+        async def _query(session):
+            stmt = select(User).where(User.id == user_id)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+        return await self._execute_query(_query)
+
     async def query_user_exists(self, username: str = None, email: str = None):
         async def _query(session):
             stmt = select(User)
