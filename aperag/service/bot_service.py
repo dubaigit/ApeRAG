@@ -56,7 +56,7 @@ class BotService:
             updated=bot.gmt_updated.isoformat(),
         )
 
-    async def create_bot(self, user: str, bot_in: view_models.BotCreate) -> view_models.Bot:
+    async def create_bot(self, user: str, bot_in: view_models.BotCreate, skip_quota_check: bool = False) -> view_models.Bot:
         # Validate collections before starting transaction
         collection_ids = []
         if bot_in.collection_ids is not None:
@@ -72,8 +72,9 @@ class BotService:
         async def _create_bot_atomically(session):
             from aperag.db.models import Bot, BotCollectionRelation, BotStatus
 
-            # Check and consume quota within the transaction
-            await quota_service.check_and_consume_quota(user, "max_bot_count", 1, session)
+            # Check and consume quota within the transaction (unless skipped for system bots)
+            if not skip_quota_check:
+                await quota_service.check_and_consume_quota(user, "max_bot_count", 1, session)
 
             # Create bot in database directly using session
             bot = Bot(
@@ -284,8 +285,9 @@ class BotService:
                 session.add(rel)
             await session.flush()
 
-            # Release quota within the transaction
-            await quota_service.release_quota(user, "max_bot_count", 1, session)
+            # Release quota within the transaction (only for non-system bots)
+            if bot_to_delete.title != "Default Agent Bot":
+                await quota_service.release_quota(user, "max_bot_count", 1, session)
 
             return bot_to_delete, collection_ids
 

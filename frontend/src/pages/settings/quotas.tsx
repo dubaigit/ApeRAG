@@ -50,10 +50,10 @@ export default () => {
 
   const getQuotaTypeName = (quotaType: string) => {
     const typeMap: Record<string, string> = {
-      'max_collection_count': formatMessage({ id: 'quota.max_collection_count' }),
-      'max_document_count': formatMessage({ id: 'quota.max_document_count' }),
-      'max_document_count_per_collection': formatMessage({ id: 'quota.max_document_count_per_collection' }),
-      'max_bot_count': formatMessage({ id: 'quota.max_bot_count' }),
+      'max_collection_count': '知识库数量',
+      'max_document_count': '文档总数',
+      'max_document_count_per_collection': '单个知识库文档数',
+      'max_bot_count': '机器人数量',
     };
     return typeMap[quotaType] || quotaType;
   };
@@ -82,13 +82,14 @@ export default () => {
     setSearchedUserQuota(undefined);
     
     try {
-      // Search for user by username, email, or user ID
+      // Search for user by exact username, email, or user ID
       const res = await quotasApi.quotasGet({ allUsers: true });
       const quotaList = res.data as UserQuotaList;
       
+      // Find exact matching user
       const foundUser = quotaList.items.find(user => 
-        user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.username === searchTerm ||
+        user.email === searchTerm ||
         user.user_id === searchTerm
       );
 
@@ -96,7 +97,7 @@ export default () => {
         setSearchedUserQuota(foundUser);
       } else {
         message.warning(formatMessage({ id: 'quota.user_not_found' }));
-        // Keep setSearchedUserQuota(undefined) - already cleared above
+        setSearchedUserQuota(undefined);
       }
     } catch (error) {
       message.error(formatMessage({ id: 'quota.search_error' }));
@@ -415,6 +416,7 @@ export default () => {
             )}
           </Card>
         )}
+
 
         {/* User quota display */}
         {shouldShowUser && displayUser && (

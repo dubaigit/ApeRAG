@@ -379,14 +379,14 @@ async def register_view(
         # Create a system API key for the user (not visible to user)
         await async_db_ops.create_api_key(user=str(user.id), description="aperag", is_system=True)
 
-        # Create a default bot for the user
+        # Create a default bot for the user (skip quota check for system bot)
         bot_create = BotCreate(
             title="Default Agent Bot",
             type=BotType.AGENT,
             description="Default agent bot created on registration.",
             collection_ids=[],
         )
-        await bot_service.create_bot(user=str(user.id), bot_in=bot_create)
+        await bot_service.create_bot(user=str(user.id), bot_in=bot_create, skip_quota_check=True)
 
         logger.info(f"Created default quotas, bot and api key for user {user.username} ({user.id})")
     except Exception as e:
