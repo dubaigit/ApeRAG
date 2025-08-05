@@ -369,6 +369,10 @@ export default {
   'quota.new_limit': 'New Limit',
   'quota.enter_new_limit': 'Enter new quota limit',
   'quota.remaining': 'Remaining: {remaining}',
+  'quota.name': 'Quota Name',
+  'quota.max_limit': 'Max Limit',
+  'quota.current_usage': 'Current Usage',
+  'quota.usage_rate': 'Usage Rate',
 
   feedback: '---------------',
   'feedback.bad.title': "What's wrong with this response?",

@@ -366,11 +366,15 @@ async def register_view(
         session.add(invitation)
         await session.commit()
 
-    # Create default API key and bot for the new user
+    # Create default API key, bot, and initialize quotas for the new user
     try:
         from aperag.db.models import BotType
         from aperag.schema.view_models import BotCreate
         from aperag.service.bot_service import bot_service
+        from aperag.service.quota_service import quota_service
+
+        # Initialize user quotas first
+        await quota_service.initialize_user_quotas(str(user.id))
 
         # Create a system API key for the user (not visible to user)
         await async_db_ops.create_api_key(user=str(user.id), description="aperag", is_system=True)
@@ -384,9 +388,9 @@ async def register_view(
         )
         await bot_service.create_bot(user=str(user.id), bot_in=bot_create)
 
-        logger.info(f"Created default bot and api key for user {user.username} ({user.id})")
+        logger.info(f"Created default quotas, bot and api key for user {user.username} ({user.id})")
     except Exception as e:
-        logger.error(f"Failed to create default bot and api key for user {user.username} ({user.id}): {e}")
+        logger.error(f"Failed to create default quotas, bot and api key for user {user.username} ({user.id}): {e}")
 
     return view_models.User(
         id=str(user.id),

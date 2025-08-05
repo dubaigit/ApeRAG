@@ -30,6 +30,7 @@ from aperag.schema import view_models
 from aperag.schema.view_models import Bot, BotList
 from aperag.utils.constant import QuotaType
 from aperag.views.utils import validate_bot_config
+from aperag.service.quota_service import quota_service
 
 
 class BotService:
@@ -56,14 +57,6 @@ class BotService:
         )
 
     async def create_bot(self, user: str, bot_in: view_models.BotCreate) -> view_models.Bot:
-        # Check quota limit
-        if settings.max_bot_count:
-            bot_limit = await self.db_ops.query_user_quota(user, QuotaType.MAX_BOT_COUNT)
-            if bot_limit is None:
-                bot_limit = settings.max_bot_count
-            if await self.db_ops.query_bots_count(user) >= bot_limit:
-                raise QuotaExceededException("bot", bot_limit)
-
         # Validate collections before starting transaction
         collection_ids = []
         if bot_in.collection_ids is not None:
@@ -78,6 +71,9 @@ class BotService:
         # Create bot and collection relations atomically in a single transaction
         async def _create_bot_atomically(session):
             from aperag.db.models import Bot, BotCollectionRelation, BotStatus
+
+            # Check and consume quota within the transaction
+            await quota_service.check_and_consume_quota(user, "max_bot_count", 1)
 
             # Create bot in database directly using session
             bot = Bot(
@@ -287,6 +283,9 @@ class BotService:
                 rel.gmt_deleted = utc_now()
                 session.add(rel)
             await session.flush()
+
+            # Release quota within the transaction
+            await quota_service.release_quota(user, "max_bot_count", 1)
 
             return bot_to_delete, collection_ids
 

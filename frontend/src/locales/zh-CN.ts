@@ -365,6 +365,10 @@ export default {
   'quota.new_limit': '新的限制',
   'quota.enter_new_limit': '请输入新的配额限制',
   'quota.remaining': '剩余: {remaining}',
+  'quota.name': '配额名称',
+  'quota.max_limit': '最大数量',
+  'quota.current_usage': '当前用量',
+  'quota.usage_rate': '使用率',
 
   feedback: '---------------',
   'feedback.bad.title': '这个回答有什么问题？',

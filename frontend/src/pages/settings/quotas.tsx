@@ -124,6 +124,39 @@ export default () => {
     );
   };
 
+  const userQuotaColumns: TableProps<QuotaInfo>['columns'] = [
+    {
+      title: formatMessage({ id: 'quota.name' }),
+      dataIndex: 'quota_type',
+      render: (quotaType: string) => getQuotaTypeName(quotaType),
+    },
+    {
+      title: formatMessage({ id: 'quota.max_limit' }),
+      dataIndex: 'quota_limit',
+      align: 'right',
+    },
+    {
+      title: formatMessage({ id: 'quota.current_usage' }),
+      dataIndex: 'current_usage',
+      align: 'right',
+    },
+    {
+      title: formatMessage({ id: 'quota.usage_rate' }),
+      render: (_, record) => {
+        const percentage = record.quota_limit > 0 ? (record.current_usage / record.quota_limit) * 100 : 0;
+        const status = percentage >= 100 ? 'exception' : percentage >= 80 ? 'active' : 'normal';
+        return (
+          <Progress
+            percent={Math.min(percentage, 100)}
+            status={status}
+            size="small"
+            format={() => `${Math.round(percentage)}%`}
+          />
+        );
+      },
+    },
+  ];
+
   const adminColumns: TableProps<UserQuotaInfo>['columns'] = [
     {
       title: formatMessage({ id: 'user.username' }),
@@ -199,19 +232,17 @@ export default () => {
         />
       ) : (
         currentUserQuota && (
-          <Row gutter={[16, 16]}>
-            <Col span={24}>
-              <Card title={formatMessage({ id: 'quota.my_quotas' })}>
-                <Row gutter={[16, 16]}>
-                  {currentUserQuota.quotas.map((quota) => (
-                    <Col key={quota.quota_type} xs={24} sm={12} md={8} lg={6}>
-                      {renderQuotaCard(quota)}
-                    </Col>
-                  ))}
-                </Row>
-              </Card>
-            </Col>
-          </Row>
+          <Card title={formatMessage({ id: 'quota.my_quotas' })}>
+            <Table
+              rowKey="quota_type"
+              bordered
+              columns={userQuotaColumns}
+              dataSource={currentUserQuota.quotas}
+              loading={loading}
+              pagination={false}
+              size="middle"
+            />
+          </Card>
         )
       )}
 

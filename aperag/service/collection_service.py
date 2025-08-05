@@ -71,42 +71,45 @@ class CollectionService:
         if not is_validate:
             raise ValidationException(error_msg)
 
-        # Use QuotaService to consume quota atomically
-        # This will check and consume quota in a single transaction
-        from aperag.db.ops import get_db_session
-        
-        for db in get_db_session():
-            try:
-                # Consume collection quota
-                QuotaService.consume_quota(user, "max_collection_count", 1, db)
-                
-                # Direct call to repository method, which handles its own transaction
-                config_str = dumpCollectionConfig(collection_config) if collection.config is not None else None
+        # Create collection and consume quota in a single transaction
+        async def _create_collection_with_quota(session):
+            from aperag.service.quota_service import quota_service
+            
+            # Check and consume quota within the transaction
+            await quota_service.check_and_consume_quota(user, "max_collection_count", 1)
+            
+            # Create collection within the same transaction
+            config_str = dumpCollectionConfig(collection_config) if collection.config is not None else None
+            
+            from aperag.db.models import Collection, CollectionStatus
+            from aperag.utils.utils import utc_now
+            
+            instance = Collection(
+                user=user,
+                title=collection.title,
+                description=collection.description,
+                type=collection.type,
+                status=CollectionStatus.ACTIVE,
+                config=config_str,
+                gmt_created=utc_now(),
+                gmt_updated=utc_now()
+            )
+            session.add(instance)
+            await session.flush()
+            await session.refresh(instance)
+            
+            return instance
 
-                instance = await self.db_ops.create_collection(
-                    user=user,
-                    title=collection.title,
-                    description=collection.description,
-                    collection_type=collection.type,
-                    config=config_str,
-                )
+        instance = await self.db_ops.execute_with_transaction(_create_collection_with_quota)
 
-                if collection.config.enable_summary:
-                    await collection_summary_service.trigger_collection_summary_generation(instance)
+        if collection.config.enable_summary:
+            await collection_summary_service.trigger_collection_summary_generation(instance)
 
-                # Initialize collection based on type
-                document_user_quota = await self.db_ops.query_user_quota(user, QuotaType.MAX_DOCUMENT_COUNT)
-                collection_init_task.delay(instance.id, document_user_quota)
+        # Initialize collection based on type
+        document_user_quota = await self.db_ops.query_user_quota(user, QuotaType.MAX_DOCUMENT_COUNT)
+        collection_init_task.delay(instance.id, document_user_quota)
 
-                return await self.build_collection_response(instance)
-                
-            except Exception as e:
-                # If collection creation fails, release the consumed quota
-                try:
-                    QuotaService.release_quota(user, "max_collection_count", 1, db)
-                except:
-                    pass  # Ignore errors during cleanup
-                raise e
+        return await self.build_collection_response(instance)
 
     async def list_collections_view(
         self, user_id: str, include_subscribed: bool = True, page: int = 1, page_size: int = 20
@@ -252,18 +255,39 @@ class CollectionService:
         if collection is None:
             return None
 
-        # Direct call to repository method, which handles its own transaction
-        deleted_instance = await self.db_ops.delete_collection_by_id(user, collection_id)
+        # Delete collection and release quota in a single transaction
+        async def _delete_collection_with_quota(session):
+            from aperag.service.quota_service import quota_service
+            from aperag.db.models import CollectionStatus
+            from aperag.utils.utils import utc_now
+            from sqlalchemy import select
+            
+            # Get collection within transaction
+            stmt = select(db_models.Collection).where(
+                db_models.Collection.id == collection_id,
+                db_models.Collection.user == user
+            )
+            result = await session.execute(stmt)
+            collection_to_delete = result.scalars().first()
+            
+            if not collection_to_delete:
+                return None
+            
+            # Mark collection as deleted
+            collection_to_delete.status = CollectionStatus.DELETED
+            collection_to_delete.gmt_deleted = utc_now()
+            
+            # Release quota within the same transaction
+            await quota_service.release_quota(user, "max_collection_count", 1)
+            
+            await session.flush()
+            await session.refresh(collection_to_delete)
+            
+            return collection_to_delete
+
+        deleted_instance = await self.db_ops.execute_with_transaction(_delete_collection_with_quota)
 
         if deleted_instance:
-            # Release collection quota
-            from aperag.db.ops import get_db_session
-            try:
-                with get_db_session() as db:
-                    QuotaService.release_quota(user, "max_collection_count", 1, db)
-            except Exception:
-                pass  # Ignore quota release errors during deletion
-            
             # Clean up related resources
             collection_delete_task.delay(collection_id)
             return await self.build_collection_response(deleted_instance)

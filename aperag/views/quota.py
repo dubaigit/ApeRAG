@@ -13,8 +13,7 @@
 # limitations under the License.
 
 import logging
-import traceback
-from typing import Dict, List, Optional, Union
+from typing import List, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
@@ -36,7 +35,7 @@ router = APIRouter()
 security = HTTPBearer()
 
 
-def _convert_quota_dict_to_list(quota_dict: Dict[str, Dict[str, int]]) -> List[QuotaInfo]:
+def _convert_quota_dict_to_list(quota_dict: dict) -> List[QuotaInfo]:
     """Convert quota dictionary to list of QuotaInfo objects"""
     return [
         QuotaInfo(
@@ -51,20 +50,18 @@ def _convert_quota_dict_to_list(quota_dict: Dict[str, Dict[str, int]]) -> List[Q
 
 @router.get("/quotas", response_model=Union[UserQuotaInfo, UserQuotaList])
 async def get_quotas(
-    user_id: Optional[str] = Query(None, description="User ID to get quotas for (admin only)"),
+    user_id: str = Query(None, description="User ID to get quotas for (admin only)"),
     all_users: bool = Query(False, description="Get quotas for all users (admin only)"),
     current_user: User = Depends(current_user)
 ):
-    """
-    Get quota information for the current user or all users (admin only)
-    """
+    """Get quota information for the current user or all users (admin only)"""
     try:
         if all_users:
             # Admin only - get all users' quotas
             if current_user.role != Role.ADMIN:
                 raise HTTPException(status_code=403, detail="Admin access required")
             
-            all_user_quotas = await quota_service.list_all_user_quotas(current_user.id)
+            all_user_quotas = await quota_service.get_all_users_quotas()
             
             items = []
             for user_quota in all_user_quotas:
@@ -93,16 +90,45 @@ async def get_quotas(
         user_quotas = await quota_service.get_user_quotas(target_user_id)
         quota_list = _convert_quota_dict_to_list(user_quotas)
         
+        # For single user response, we need to get user info
+        if target_user_id == current_user.id:
+            username = current_user.username
+            email = current_user.email
+            role = current_user.role
+        else:
+            # For admin getting other user's quota, we need to fetch user info
+            from aperag.db.repositories.user import AsyncUserRepositoryMixin
+            from aperag.db.ops import async_db_ops
+            
+            class UserRepo(AsyncUserRepositoryMixin):
+                def __init__(self):
+                    self.db_ops = async_db_ops
+                    
+                async def _execute_query(self, query_func):
+                    return await self.db_ops._execute_query(query_func)
+                    
+                async def execute_with_transaction(self, operation_func):
+                    return await self.db_ops.execute_with_transaction(operation_func)
+            
+            user_repo = UserRepo()
+            target_user = await user_repo.query_user_by_id(target_user_id)
+            if not target_user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            username = target_user.username
+            email = target_user.email
+            role = target_user.role
+        
         return UserQuotaInfo(
             user_id=target_user_id,
-            username=current_user.username if target_user_id == current_user.id else target_user_id,
-            email=current_user.email if target_user_id == current_user.id else None,
-            role=current_user.role if target_user_id == current_user.id else "unknown",
+            username=username,
+            email=email,
+            role=role,
             quotas=quota_list
         )
         
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting quotas: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -114,9 +140,7 @@ async def update_quota(
     request: QuotaUpdateRequest,
     current_user: User = Depends(current_user)
 ):
-    """
-    Update quota limit for a specific user (admin only)
-    """
+    """Update quota limit for a specific user (admin only)"""
     try:
         # Only admin users can update quotas
         if current_user.role != Role.ADMIN:
@@ -128,8 +152,7 @@ async def update_quota(
         
         # Update the quota
         success = await quota_service.update_user_quota(
-            admin_user_id=current_user.id,
-            target_user_id=user_id,
+            user_id=user_id,
             quota_type=request.quota_type,
             new_limit=request.new_limit
         )
@@ -146,8 +169,8 @@ async def update_quota(
             new_limit=request.new_limit
         )
         
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error updating quota: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -158,9 +181,7 @@ async def recalculate_quota_usage(
     user_id: str,
     current_user: User = Depends(current_user)
 ):
-    """
-    Recalculate and update current usage for all quota types for a user (admin only)
-    """
+    """Recalculate and update current usage for all quota types for a user (admin only)"""
     try:
         # Only admin users can recalculate quotas
         if current_user.role != Role.ADMIN:
