@@ -390,6 +390,15 @@ export default {
   'quota.no_search_results': 'No matching users found',
   'quota.no_data': 'No data available',
 
+  // Quota error messages
+  'quota.error.exceeded': 'Quota exceeded',
+  'quota.error.collection_exceeded': 'Collection limit reached',
+  'quota.error.document_exceeded': 'Document limit reached',
+  'quota.error.bot_exceeded': 'Bot limit reached',
+  'quota.error.exceeded_detail': 'Current usage: {current}/{limit}',
+  'quota.error.upgrade_hint': 'Please contact administrator or upgrade your account for more quota',
+  'quota.error.current_usage': 'Currently using {current} of {limit}',
+
   feedback: '---------------',
   'feedback.bad.title': "What's wrong with this response?",
   'feedback.bad.description': 'Please select a reason for your feedback',

@@ -225,7 +225,7 @@ class QuotaService:
             
             # Check if consuming this amount would exceed the limit
             if quota.current_usage + amount > quota.quota_limit:
-                raise QuotaExceededException(quota_type, quota.quota_limit)
+                raise QuotaExceededException(quota_type, quota.quota_limit, quota.current_usage)
             
             # Update usage
             quota.current_usage += amount

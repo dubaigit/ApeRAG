@@ -386,6 +386,15 @@ export default {
   'quota.no_search_results': '未找到匹配的用户',
   'quota.no_data': '暂无数据',
 
+  // Quota error messages
+  'quota.error.exceeded': '配额已超限',
+  'quota.error.collection_exceeded': '知识库数量已达到上限',
+  'quota.error.document_exceeded': '文档数量已达到上限',
+  'quota.error.bot_exceeded': '机器人数量已达到上限',
+  'quota.error.exceeded_detail': '当前使用量: {current}/{limit}',
+  'quota.error.upgrade_hint': '如需更多配额，请联系管理员',
+  'quota.error.current_usage': '当前已使用 {current} 个，限制为 {limit} 个',
+
   feedback: '---------------',
   'feedback.bad.title': '这个回答有什么问题？',
   'feedback.bad.description': '请选择你不满意的原因',

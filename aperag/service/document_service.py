@@ -259,7 +259,7 @@ class DocumentService:
             per_collection_quota = result.scalars().first()
             
             if per_collection_quota and (existing_doc_count + len(files)) > per_collection_quota.quota_limit:
-                raise QuotaExceededException("max_document_count_per_collection", per_collection_quota.quota_limit)
+                raise QuotaExceededException("max_document_count_per_collection", per_collection_quota.quota_limit, existing_doc_count)
 
             documents_created = []
             async_obj_store = get_async_object_store()

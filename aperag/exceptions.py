@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2025 ApeCloud, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -150,10 +151,32 @@ class CollectionInactiveException(BusinessException):
 class QuotaExceededException(BusinessException):
     """Quota exceeded exception"""
 
-    def __init__(self, resource_type: str, limit: int):
-        super().__init__(
-            ErrorCode.COLLECTION_QUOTA_EXCEEDED, f"{resource_type} number has reached the limit of {limit}"
-        )
+    def __init__(self, resource_type: str, limit: int, current_usage: int = None):
+        # Map resource types to appropriate error codes
+        error_code_map = {
+            'max_collection_count': ErrorCode.COLLECTION_QUOTA_EXCEEDED,
+            'max_document_count': ErrorCode.DOCUMENT_QUOTA_EXCEEDED,
+            'max_document_count_per_collection': ErrorCode.DOCUMENT_QUOTA_EXCEEDED,
+            'max_bot_count': ErrorCode.BOT_QUOTA_EXCEEDED,
+        }
+        
+        error_code = error_code_map.get(resource_type, ErrorCode.COLLECTION_QUOTA_EXCEEDED)
+        
+        # Create a more user-friendly message
+        if current_usage is not None:
+            message = f"已达到{resource_type}的配额限制。当前使用量: {current_usage}/{limit}"
+        else:
+            message = f"已达到{resource_type}的配额限制 ({limit})"
+        
+        # Add details for better error handling
+        details = {
+            'quota_type': resource_type,
+            'quota_limit': limit,
+            'current_usage': current_usage,
+            'quota_exceeded': True
+        }
+        
+        super().__init__(error_code, message, details)
 
 
 class BotNotFoundException(BusinessException):
@@ -283,9 +306,9 @@ def invalid_param(parameter_name: str, reason: str = None) -> InvalidParameterEx
     return InvalidParameterException(parameter_name, reason)
 
 
-def quota_exceeded(resource_type: str, limit: int) -> QuotaExceededException:
+def quota_exceeded(resource_type: str, limit: int, current_usage: int = None) -> QuotaExceededException:
     """Create a quota exceeded exception"""
-    return QuotaExceededException(resource_type, limit)
+    return QuotaExceededException(resource_type, limit, current_usage)
 
 
 def validation_error(message: str, details: Dict[str, Any] = None) -> ValidationException:
