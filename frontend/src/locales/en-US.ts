@@ -389,6 +389,14 @@ export default {
   'quota.user_quotas_for': 'Quotas for {username}',
   'quota.no_search_results': 'No matching users found',
   'quota.no_data': 'No data available',
+  'quota.user_info': 'User Information',
+  'quota.quota_info': 'Quota Information',
+  'quota.clear': 'Clear',
+  'quota.username': 'Username',
+  'quota.user_id': 'User ID',
+  'quota.email': 'Email',
+  'quota.role': 'Role',
+  'quota.not_set': 'Not Set',
 
   // Quota error messages
   'quota.error.exceeded': 'Quota exceeded',

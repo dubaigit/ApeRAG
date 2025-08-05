@@ -385,6 +385,14 @@ export default {
   'quota.user_quotas_for': '{username} 的配额',
   'quota.no_search_results': '未找到匹配的用户',
   'quota.no_data': '暂无数据',
+  'quota.user_info': '用户信息',
+  'quota.quota_info': '配额信息',
+  'quota.clear': '清空',
+  'quota.username': '用户名',
+  'quota.user_id': '用户ID',
+  'quota.email': '邮箱',
+  'quota.role': '角色',
+  'quota.not_set': '未设置',
 
   // Quota error messages
   'quota.error.exceeded': '配额已超限',

@@ -50,10 +50,10 @@ export default () => {
 
   const getQuotaTypeName = (quotaType: string) => {
     const typeMap: Record<string, string> = {
-      'max_collection_count': '知识库数量',
-      'max_document_count': '文档总数',
-      'max_document_count_per_collection': '单个知识库文档数',
-      'max_bot_count': '机器人数量',
+      'max_collection_count': formatMessage({ id: 'quota.max_collection_count' }),
+      'max_document_count': formatMessage({ id: 'quota.max_document_count' }),
+      'max_document_count_per_collection': formatMessage({ id: 'quota.max_document_count_per_collection' }),
+      'max_bot_count': formatMessage({ id: 'quota.max_bot_count' }),
     };
     return typeMap[quotaType] || quotaType;
   };
@@ -377,7 +377,7 @@ export default () => {
                 onClick={clearSearch}
                 disabled={!searchValue}
               >
-                清空
+                <FormattedMessage id="quota.clear" />
               </Button>
             </Space.Compact>
             {searchValue && (
@@ -397,34 +397,34 @@ export default () => {
           <div>
             {/* User Information Card */}
             <Card 
-              title="用户信息"
+              title={formatMessage({ id: 'quota.user_info' })}
               style={{ marginBottom: 16 }}
             >
               <Row gutter={[24, 16]}>
                 <Col span={6}>
                   <div>
-                    <Typography.Text type="secondary">用户名</Typography.Text>
+                    <Typography.Text type="secondary">{formatMessage({ id: 'quota.username' })}</Typography.Text>
                     <br />
                     <Typography.Text strong>{displayUser.username}</Typography.Text>
                   </div>
                 </Col>
                 <Col span={6}>
                   <div>
-                    <Typography.Text type="secondary">用户ID</Typography.Text>
+                    <Typography.Text type="secondary">{formatMessage({ id: 'quota.user_id' })}</Typography.Text>
                     <br />
                     <Typography.Text strong>{displayUser.user_id}</Typography.Text>
                   </div>
                 </Col>
                 <Col span={6}>
                   <div>
-                    <Typography.Text type="secondary">邮箱</Typography.Text>
+                    <Typography.Text type="secondary">{formatMessage({ id: 'quota.email' })}</Typography.Text>
                     <br />
-                    <Typography.Text strong>{displayUser.email || '未设置'}</Typography.Text>
+                    <Typography.Text strong>{displayUser.email || formatMessage({ id: 'quota.not_set' })}</Typography.Text>
                   </div>
                 </Col>
                 <Col span={6}>
                   <div>
-                    <Typography.Text type="secondary">角色</Typography.Text>
+                    <Typography.Text type="secondary">{formatMessage({ id: 'quota.role' })}</Typography.Text>
                     <br />
                     <Typography.Text strong>{displayUser.role}</Typography.Text>
                   </div>
@@ -434,7 +434,7 @@ export default () => {
 
             {/* Quota Information Card */}
             <Card 
-              title="配额信息"
+              title={formatMessage({ id: 'quota.quota_info' })}
               extra={
                 isAdmin && displayUser && (
                   <Space>
