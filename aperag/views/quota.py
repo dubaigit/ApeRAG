@@ -13,12 +13,13 @@
 # limitations under the License.
 
 import logging
+import traceback
 from typing import Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
 
-from aperag.auth.authentication import get_current_user
+from aperag.views.auth import current_user
 from aperag.db.models import Role, User
 from aperag.schema.view_models import (
     QuotaInfo,
@@ -52,7 +53,7 @@ def _convert_quota_dict_to_list(quota_dict: Dict[str, Dict[str, int]]) -> List[Q
 async def get_quotas(
     user_id: Optional[str] = Query(None, description="User ID to get quotas for (admin only)"),
     all_users: bool = Query(False, description="Get quotas for all users (admin only)"),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(current_user)
 ):
     """
     Get quota information for the current user or all users (admin only)
@@ -111,7 +112,7 @@ async def get_quotas(
 async def update_quota(
     user_id: str,
     request: QuotaUpdateRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(current_user)
 ):
     """
     Update quota limit for a specific user (admin only)
@@ -155,7 +156,7 @@ async def update_quota(
 @router.post("/quotas/{user_id}/recalculate")
 async def recalculate_quota_usage(
     user_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(current_user)
 ):
     """
     Recalculate and update current usage for all quota types for a user (admin only)

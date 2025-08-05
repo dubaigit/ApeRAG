@@ -34,8 +34,18 @@ export const NavbarSettings = () => {
           key: `/settings/users`,
         });
         items.push({
+          label: <FormattedMessage id="quota.management" />,
+          key: `/settings/quotas`,
+        });
+        items.push({
           label: <FormattedMessage id="settings.miscellaneous" />,
           key: `/settings/miscellaneous`,
+        });
+      } else {
+        // Regular users can view their own quotas
+        items.push({
+          label: <FormattedMessage id="quota.management" />,
+          key: `/settings/quotas`,
         });
       }
 
