@@ -219,14 +219,13 @@ class QuotaService:
             quota = result.scalars().first()
             
             if not quota:
-                raise QuotaExceededException(f"Quota {quota_type} not found for user {user_id}")
+                # Use a different exception for quota not found case
+                from aperag.exceptions import ResourceNotFoundException
+                raise ResourceNotFoundException("quota", f"{quota_type} for user {user_id}")
             
             # Check if consuming this amount would exceed the limit
             if quota.current_usage + amount > quota.quota_limit:
-                raise QuotaExceededException(
-                    f"Quota exceeded: {quota_type} limit is {quota.quota_limit}, "
-                    f"current usage is {quota.current_usage}, requested amount is {amount}"
-                )
+                raise QuotaExceededException(quota_type, quota.quota_limit)
             
             # Update usage
             quota.current_usage += amount
