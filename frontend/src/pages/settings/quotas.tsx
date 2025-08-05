@@ -1,12 +1,13 @@
 import { QuotaInfo, UserQuotaInfo, UserQuotaList, QuotaUpdateRequest } from '@/api';
 import { PageContainer, PageHeader, RefreshButton } from '@/components';
 import { quotasApi } from '@/services';
-import { EditOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import { EditOutlined, ReloadOutlined, SettingOutlined, SearchOutlined, ClearOutlined } from '@ant-design/icons';
 import { 
   Button, 
   Card, 
   Col, 
   Form, 
+  Input,
   InputNumber, 
   Modal, 
   Progress, 
@@ -16,7 +17,8 @@ import {
   TableProps, 
   Typography, 
   message,
-  Tabs 
+  Tabs,
+  Space 
 } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { FormattedMessage, useIntl, useModel } from 'umi';
@@ -31,24 +33,20 @@ interface SystemDefaultQuotas {
 export default () => {
   const { formatMessage } = useIntl();
   const userModel = useModel('user');
-  const [userQuotas, setUserQuotas] = useState<UserQuotaInfo[]>([]);
   const [currentUserQuota, setCurrentUserQuota] = useState<UserQuotaInfo>();
+  const [searchedUserQuota, setSearchedUserQuota] = useState<UserQuotaInfo>();
   const [systemDefaultQuotas, setSystemDefaultQuotas] = useState<SystemDefaultQuotas>();
   const [loading, setLoading] = useState<boolean>(false);
+  const [searchLoading, setSearchLoading] = useState<boolean>(false);
   const [systemQuotasLoading, setSystemQuotasLoading] = useState<boolean>(false);
   const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
   const [systemQuotasModalVisible, setSystemQuotasModalVisible] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<UserQuotaInfo>();
+  const [searchValue, setSearchValue] = useState<string>('');
   const [form] = Form.useForm();
   const [systemQuotasForm] = Form.useForm();
 
   const isAdmin = (userModel as any)?.user?.role === 'admin';
-  
-  // Debug: log user info
-  console.log('User model:', userModel);
-  console.log('User:', (userModel as any)?.user);
-  console.log('User role:', (userModel as any)?.user?.role);
-  console.log('Is admin:', isAdmin);
 
   const getQuotaTypeName = (quotaType: string) => {
     const typeMap: Record<string, string> = {
@@ -60,26 +58,61 @@ export default () => {
     return typeMap[quotaType] || quotaType;
   };
 
-  const getQuotas = useCallback(async () => {
+  const getCurrentUserQuotas = useCallback(async () => {
     setLoading(true);
     try {
-      if (isAdmin) {
-        // Admin: get all users' quotas
-        const res = await quotasApi.quotasGet({ allUsers: true });
-        const quotaList = res.data as UserQuotaList;
-        setUserQuotas(quotaList.items);
-      } else {
-        // Regular user: get own quotas
-        const res = await quotasApi.quotasGet();
-        const userQuota = res.data as UserQuotaInfo;
-        setCurrentUserQuota(userQuota);
-      }
+      const res = await quotasApi.quotasGet();
+      const userQuota = res.data as UserQuotaInfo;
+      setCurrentUserQuota(userQuota);
     } catch (error) {
       message.error(formatMessage({ id: 'quota.fetch_error' }));
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, formatMessage]);
+  }, [formatMessage]);
+
+  const searchUserQuotas = useCallback(async (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setSearchedUserQuota(undefined);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      // Search for user by username, email, or user ID
+      const res = await quotasApi.quotasGet({ allUsers: true });
+      const quotaList = res.data as UserQuotaList;
+      
+      const foundUser = quotaList.items.find(user => 
+        user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.user_id === searchTerm
+      );
+
+      if (foundUser) {
+        setSearchedUserQuota(foundUser);
+      } else {
+        message.warning(formatMessage({ id: 'quota.user_not_found' }));
+        setSearchedUserQuota(undefined);
+      }
+    } catch (error) {
+      message.error(formatMessage({ id: 'quota.search_error' }));
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [formatMessage]);
+
+  const handleSearch = (value: string) => {
+    setSearchValue(value);
+    if (isAdmin) {
+      searchUserQuotas(value);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchValue('');
+    setSearchedUserQuota(undefined);
+  };
 
   const handleEditQuota = (user: UserQuotaInfo) => {
     setEditingUser(user);
@@ -100,7 +133,15 @@ export default () => {
       });
       message.success(formatMessage({ id: 'quota.update_success' }));
       setEditModalVisible(false);
-      getQuotas();
+      
+      // Refresh the data
+      if (searchedUserQuota && searchedUserQuota.user_id === editingUser.user_id) {
+        // If we're viewing a searched user, refresh their data
+        searchUserQuotas(searchValue);
+      } else {
+        // Otherwise refresh current user data
+        getCurrentUserQuotas();
+      }
     } catch (error) {
       message.error(formatMessage({ id: 'quota.update_error' }));
     }
@@ -112,7 +153,15 @@ export default () => {
         userId: userId
       });
       message.success(formatMessage({ id: 'quota.recalculate_success' }));
-      getQuotas();
+      
+      // Refresh the data
+      if (searchedUserQuota && searchedUserQuota.user_id === userId) {
+        // If we're viewing a searched user, refresh their data
+        searchUserQuotas(searchValue);
+      } else {
+        // Otherwise refresh current user data
+        getCurrentUserQuotas();
+      }
     } catch (error) {
       message.error(formatMessage({ id: 'quota.recalculate_error' }));
     }
@@ -232,63 +281,12 @@ export default () => {
     },
   ];
 
-  const adminColumns: TableProps<UserQuotaInfo>['columns'] = [
-    {
-      title: formatMessage({ id: 'user.username' }),
-      dataIndex: 'username',
-      width: 120,
-    },
-    {
-      title: formatMessage({ id: 'user.email' }),
-      dataIndex: 'email',
-      width: 200,
-    },
-    {
-      title: formatMessage({ id: 'user.role' }),
-      dataIndex: 'role',
-      width: 80,
-    },
-    {
-      title: formatMessage({ id: 'quota.quotas' }),
-      dataIndex: 'quotas',
-      render: (quotas: QuotaInfo[]) => (
-        <div style={{ minWidth: 300 }}>
-          {quotas.map(renderQuotaCard)}
-        </div>
-      ),
-    },
-    {
-      title: formatMessage({ id: 'action.name' }),
-      width: 120,
-      render: (_, record) => (
-        <div>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEditQuota(record)}
-          >
-            <FormattedMessage id="action.edit" />
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<ReloadOutlined />}
-            onClick={() => handleRecalculateUsage(record.user_id)}
-          >
-            <FormattedMessage id="quota.recalculate" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
   useEffect(() => {
-    getQuotas();
+    getCurrentUserQuotas();
     if (isAdmin) {
       getSystemDefaultQuotas();
     }
-  }, [getQuotas, getSystemDefaultQuotas, isAdmin]);
+  }, [getCurrentUserQuotas, getSystemDefaultQuotas, isAdmin]);
 
   const renderSystemDefaultQuotasTab = () => (
     <Card 
@@ -363,34 +361,125 @@ export default () => {
     </Card>
   );
 
-  const renderUserQuotasTab = () => (
-    <>
-      {isAdmin ? (
-        <Table
-          rowKey="user_id"
-          bordered
-          columns={adminColumns}
-          dataSource={userQuotas}
-          loading={loading}
-          pagination={{ pageSize: 10 }}
-        />
-      ) : (
-        currentUserQuota && (
-          <Card title={formatMessage({ id: 'quota.my_quotas' })}>
+  const renderUserQuotasTab = () => {
+    // Determine which user data to display
+    const displayUser = searchedUserQuota || currentUserQuota;
+    const isSearchResult = !!searchedUserQuota;
+
+    return (
+      <div>
+        {/* Search bar for admin users */}
+        {isAdmin && (
+          <Card style={{ marginBottom: 16 }}>
+            <Space.Compact style={{ width: '100%' }}>
+              <Input
+                placeholder={formatMessage({ id: 'quota.search_placeholder' })}
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onPressEnter={() => handleSearch(searchValue)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={() => handleSearch(searchValue)}
+                loading={searchLoading}
+              >
+                <FormattedMessage id="action.search" />
+              </Button>
+              <Button
+                icon={<ClearOutlined />}
+                onClick={clearSearch}
+                disabled={!searchValue}
+              >
+                <FormattedMessage id="action.clear" />
+              </Button>
+            </Space.Compact>
+            {searchValue && (
+              <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                <FormattedMessage 
+                  id="quota.search_tip" 
+                  values={{ searchTerm: searchValue }}
+                />
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* User quota display */}
+        {displayUser && (
+          <Card 
+            title={
+              isSearchResult 
+                ? formatMessage({ id: 'quota.user_quotas_for' }, { username: displayUser.username })
+                : formatMessage({ id: 'quota.my_quotas' })
+            }
+            extra={
+              isAdmin && displayUser && (
+                <Space>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => handleEditQuota(displayUser)}
+                  >
+                    <FormattedMessage id="action.edit" />
+                  </Button>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={() => handleRecalculateUsage(displayUser.user_id)}
+                  >
+                    <FormattedMessage id="quota.recalculate" />
+                  </Button>
+                </Space>
+              )
+            }
+          >
+            {isSearchResult && (
+              <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
+                <Typography.Text strong>
+                  <FormattedMessage id="user.username" />: {displayUser.username}
+                </Typography.Text>
+                <br />
+                <Typography.Text>
+                  <FormattedMessage id="user.email" />: {displayUser.email}
+                </Typography.Text>
+                <br />
+                <Typography.Text>
+                  <FormattedMessage id="user.role" />: {displayUser.role}
+                </Typography.Text>
+              </div>
+            )}
             <Table
               rowKey="quota_type"
               bordered
               columns={userQuotaColumns}
-              dataSource={currentUserQuota.quotas}
-              loading={loading}
+              dataSource={displayUser.quotas}
+              loading={loading || searchLoading}
               pagination={false}
               size="middle"
             />
           </Card>
-        )
-      )}
-    </>
-  );
+        )}
+
+        {/* No data state */}
+        {!displayUser && !loading && !searchLoading && (
+          <Card>
+            <div style={{ textAlign: 'center', padding: 40 }}>
+              <Typography.Text type="secondary">
+                {isAdmin && searchValue 
+                  ? formatMessage({ id: 'quota.no_search_results' })
+                  : formatMessage({ id: 'quota.no_data' })
+                }
+              </Typography.Text>
+            </div>
+          </Card>
+        )}
+      </div>
+    );
+  };
 
   return (
     <PageContainer>
@@ -398,7 +487,16 @@ export default () => {
         title={formatMessage({ id: 'quota.management' })}
         description={formatMessage({ id: 'quota.management_tips' })}
       >
-        <RefreshButton loading={loading} onClick={getQuotas} />
+        <RefreshButton 
+          loading={loading} 
+          onClick={() => {
+            if (searchedUserQuota) {
+              searchUserQuotas(searchValue);
+            } else {
+              getCurrentUserQuotas();
+            }
+          }} 
+        />
       </PageHeader>
 
       {isAdmin ? (

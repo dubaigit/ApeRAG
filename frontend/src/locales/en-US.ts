@@ -382,6 +382,13 @@ export default {
   'quota.system_update_success': 'System default quotas updated successfully',
   'quota.system_update_error': 'Failed to update system default quotas',
   'quota.system_loading': 'Loading...',
+  'quota.search_placeholder': 'Search by username, email or user ID',
+  'quota.search_error': 'Failed to search users',
+  'quota.user_not_found': 'No matching user found',
+  'quota.search_tip': 'Search: {searchTerm}',
+  'quota.user_quotas_for': 'Quotas for {username}',
+  'quota.no_search_results': 'No matching users found',
+  'quota.no_data': 'No data available',
 
   feedback: '---------------',
   'feedback.bad.title': "What's wrong with this response?",
