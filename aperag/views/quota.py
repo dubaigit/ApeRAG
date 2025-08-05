@@ -26,6 +26,10 @@ from aperag.schema.view_models import (
     QuotaUpdateResponse,
     UserQuotaInfo,
     UserQuotaList,
+    SystemDefaultQuotas,
+    SystemDefaultQuotasResponse,
+    SystemDefaultQuotasUpdateRequest,
+    SystemDefaultQuotasUpdateResponse,
 )
 from aperag.service.quota_service import quota_service
 
@@ -198,4 +202,61 @@ async def recalculate_quota_usage(
         
     except Exception as e:
         logger.error(f"Error recalculating quota usage: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/system/default-quotas", response_model=SystemDefaultQuotasResponse)
+async def get_system_default_quotas(
+    current_user: User = Depends(current_user)
+):
+    """Get system default quota configuration (admin only)"""
+    try:
+        # Only admin users can view system default quotas
+        if current_user.role != Role.ADMIN:
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Get system default quotas
+        default_quotas = await quota_service.get_system_default_quotas()
+        
+        return SystemDefaultQuotasResponse(
+            quotas=SystemDefaultQuotas(**default_quotas)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting system default quotas: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/system/default-quotas", response_model=SystemDefaultQuotasUpdateResponse)
+async def update_system_default_quotas(
+    request: SystemDefaultQuotasUpdateRequest,
+    current_user: User = Depends(current_user)
+):
+    """Update system default quota configuration (admin only)"""
+    try:
+        # Only admin users can update system default quotas
+        if current_user.role != Role.ADMIN:
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Convert Pydantic model to dict
+        quotas_dict = request.quotas.dict()
+        
+        # Update system default quotas
+        success = await quota_service.update_system_default_quotas(quotas_dict)
+        
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to update system default quotas")
+        
+        return SystemDefaultQuotasUpdateResponse(
+            success=True,
+            message="System default quotas updated successfully",
+            quotas=request.quotas
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating system default quotas: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

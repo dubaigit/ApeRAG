@@ -57,17 +57,21 @@ class QuotaService:
         async def _query(session):
             from aperag.db.models import User, UserQuota
             from sqlalchemy import select
-            from sqlalchemy.orm import selectinload
             
-            # Get all users with their quotas
-            stmt = select(User).options(selectinload(User.quotas)).where(User.gmt_deleted.is_(None))
+            # Get all users
+            stmt = select(User).where(User.gmt_deleted.is_(None))
             result = await session.execute(stmt)
             users = result.scalars().all()
             
             result_list = []
             for user in users:
+                # Get quotas for this user
+                quota_stmt = select(UserQuota).where(UserQuota.user == user.id)
+                quota_result = await session.execute(quota_stmt)
+                quotas = quota_result.scalars().all()
+                
                 quota_dict = {}
-                for quota in user.quotas:
+                for quota in quotas:
                     quota_dict[quota.key] = {
                         'quota_limit': quota.quota_limit,
                         'current_usage': quota.current_usage,
@@ -261,20 +265,71 @@ class QuotaService:
             # Create new transaction
             return await self.db_ops.execute_with_transaction(_operation)
 
-    async def initialize_user_quotas(self, user_id: str) -> None:
-        """Initialize default quotas for a new user."""
-        async def _operation(session):
-            from aperag.db.models import UserQuota
+    async def get_system_default_quotas(self) -> Dict[str, int]:
+        """Get system default quotas from config table."""
+        async def _query(session):
+            from aperag.db.models import ConfigModel
             from sqlalchemy import select
-            from aperag.utils.utils import utc_now
+            import json
             
-            # Default quota limits (these could be configurable)
-            default_quotas = {
+            stmt = select(ConfigModel).where(ConfigModel.key == 'system_default_quotas')
+            result = await session.execute(stmt)
+            config = result.scalars().first()
+            
+            if config:
+                try:
+                    return json.loads(config.value)
+                except json.JSONDecodeError:
+                    pass
+            
+            # Return hardcoded defaults if not found in config
+            return {
                 "max_collection_count": 10,
                 "max_document_count": 1000,
                 "max_document_count_per_collection": 100,
                 "max_bot_count": 5,
             }
+        
+        return await self.db_ops._execute_query(_query)
+
+    async def update_system_default_quotas(self, quotas: Dict[str, int]) -> bool:
+        """Update system default quotas in config table."""
+        async def _operation(session):
+            from aperag.db.models import ConfigModel
+            from sqlalchemy import select
+            from aperag.utils.utils import utc_now
+            import json
+            
+            stmt = select(ConfigModel).where(ConfigModel.key == 'system_default_quotas')
+            result = await session.execute(stmt)
+            config = result.scalars().first()
+            
+            if config:
+                config.value = json.dumps(quotas)
+                config.gmt_updated = utc_now()
+            else:
+                config = ConfigModel(
+                    key='system_default_quotas',
+                    value=json.dumps(quotas),
+                    gmt_created=utc_now(),
+                    gmt_updated=utc_now()
+                )
+                session.add(config)
+            
+            await session.flush()
+            return True
+        
+        return await self.db_ops.execute_with_transaction(_operation)
+
+    async def initialize_user_quotas(self, user_id: str) -> None:
+        """Initialize default quotas for a new user from system defaults."""
+        async def _operation(session):
+            from aperag.db.models import UserQuota
+            from sqlalchemy import select
+            from aperag.utils.utils import utc_now
+            
+            # Get default quotas from system config
+            default_quotas = await self.get_system_default_quotas()
             
             for quota_type, limit in default_quotas.items():
                 # Check if quota already exists

@@ -2066,3 +2066,40 @@ class QuotaUpdateResponse(BaseModel):
     quota_type: str = Field(..., description='Type of quota that was updated', example='max_collection_count')
     old_limit: int = Field(..., description='Previous quota limit', example=10)
     new_limit: int = Field(..., description='New quota limit', example=20)
+
+
+class SystemDefaultQuotas(BaseModel):
+    """
+    System default quota configuration
+    """
+    
+    max_collection_count: int = Field(..., description='Default maximum collection count', example=10)
+    max_document_count: int = Field(..., description='Default maximum document count', example=1000)
+    max_document_count_per_collection: int = Field(..., description='Default maximum documents per collection', example=100)
+    max_bot_count: int = Field(..., description='Default maximum bot count', example=5)
+
+
+class SystemDefaultQuotasResponse(BaseModel):
+    """
+    Response containing system default quotas
+    """
+    
+    quotas: SystemDefaultQuotas = Field(..., description='System default quota configuration')
+
+
+class SystemDefaultQuotasUpdateRequest(BaseModel):
+    """
+    Request to update system default quotas
+    """
+    
+    quotas: SystemDefaultQuotas = Field(..., description='New system default quota configuration')
+
+
+class SystemDefaultQuotasUpdateResponse(BaseModel):
+    """
+    Response after updating system default quotas
+    """
+    
+    success: bool = Field(..., description='Whether the update was successful', example=True)
+    message: str = Field(..., description='Status message', example='System default quotas updated successfully')
+    quotas: SystemDefaultQuotas = Field(..., description='Updated system default quota configuration')

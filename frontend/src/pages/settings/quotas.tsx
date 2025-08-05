@@ -1,7 +1,7 @@
 import { QuotaInfo, UserQuotaInfo, UserQuotaList, QuotaUpdateRequest } from '@/api';
 import { PageContainer, PageHeader, RefreshButton } from '@/components';
 import { quotasApi } from '@/services';
-import { EditOutlined, ReloadOutlined } from '@ant-design/icons';
+import { EditOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
 import { 
   Button, 
   Card, 
@@ -15,22 +15,40 @@ import {
   Table, 
   TableProps, 
   Typography, 
-  message 
+  message,
+  Tabs 
 } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { FormattedMessage, useIntl, useModel } from 'umi';
+
+interface SystemDefaultQuotas {
+  max_collection_count: number;
+  max_document_count: number;
+  max_document_count_per_collection: number;
+  max_bot_count: number;
+}
 
 export default () => {
   const { formatMessage } = useIntl();
   const userModel = useModel('user');
   const [userQuotas, setUserQuotas] = useState<UserQuotaInfo[]>([]);
   const [currentUserQuota, setCurrentUserQuota] = useState<UserQuotaInfo>();
+  const [systemDefaultQuotas, setSystemDefaultQuotas] = useState<SystemDefaultQuotas>();
   const [loading, setLoading] = useState<boolean>(false);
+  const [systemQuotasLoading, setSystemQuotasLoading] = useState<boolean>(false);
   const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
+  const [systemQuotasModalVisible, setSystemQuotasModalVisible] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<UserQuotaInfo>();
   const [form] = Form.useForm();
+  const [systemQuotasForm] = Form.useForm();
 
-  const isAdmin = (userModel as any)?.currentUser?.role === 'admin';
+  const isAdmin = (userModel as any)?.user?.role === 'admin';
+  
+  // Debug: log user info
+  console.log('User model:', userModel);
+  console.log('User:', (userModel as any)?.user);
+  console.log('User role:', (userModel as any)?.user?.role);
+  console.log('Is admin:', isAdmin);
 
   const getQuotaTypeName = (quotaType: string) => {
     const typeMap: Record<string, string> = {
@@ -97,6 +115,63 @@ export default () => {
       getQuotas();
     } catch (error) {
       message.error(formatMessage({ id: 'quota.recalculate_error' }));
+    }
+  };
+
+  const getSystemDefaultQuotas = useCallback(async () => {
+    if (!isAdmin) return;
+    
+    setSystemQuotasLoading(true);
+    try {
+      // Use the same request configuration as other API calls
+      const response = await fetch('/api/v1/system/default-quotas', {
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSystemDefaultQuotas(data.quotas);
+      } else {
+        throw new Error('Failed to fetch system default quotas');
+      }
+    } catch (error) {
+      message.error(formatMessage({ id: 'quota.system_fetch_error' }));
+    } finally {
+      setSystemQuotasLoading(false);
+    }
+  }, [isAdmin, formatMessage]);
+
+  const handleEditSystemQuotas = () => {
+    if (systemDefaultQuotas) {
+      systemQuotasForm.setFieldsValue(systemDefaultQuotas);
+      setSystemQuotasModalVisible(true);
+    }
+  };
+
+  const handleUpdateSystemQuotas = async (values: SystemDefaultQuotas) => {
+    try {
+      // Use the same request configuration as other API calls
+      const response = await fetch('/api/v1/system/default-quotas', {
+        method: 'PUT',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ quotas: values }),
+      });
+      
+      if (response.ok) {
+        message.success(formatMessage({ id: 'quota.system_update_success' }));
+        setSystemQuotasModalVisible(false);
+        getSystemDefaultQuotas();
+      } else {
+        throw new Error('Failed to update system default quotas');
+      }
+    } catch (error) {
+      message.error(formatMessage({ id: 'quota.system_update_error' }));
     }
   };
 
@@ -210,17 +285,86 @@ export default () => {
 
   useEffect(() => {
     getQuotas();
-  }, [getQuotas]);
+    if (isAdmin) {
+      getSystemDefaultQuotas();
+    }
+  }, [getQuotas, getSystemDefaultQuotas, isAdmin]);
 
-  return (
-    <PageContainer>
-      <PageHeader
-        title={formatMessage({ id: 'quota.management' })}
-        description={formatMessage({ id: 'quota.management_tips' })}
-      >
-        <RefreshButton loading={loading} onClick={getQuotas} />
-      </PageHeader>
+  const renderSystemDefaultQuotasTab = () => (
+    <Card 
+      title={formatMessage({ id: 'quota.system_default_quotas' })}
+      extra={
+        <Button
+          type="primary"
+          icon={<SettingOutlined />}
+          onClick={handleEditSystemQuotas}
+          loading={systemQuotasLoading}
+        >
+          <FormattedMessage id="action.edit" />
+        </Button>
+      }
+    >
+      {systemDefaultQuotas ? (
+        <Row gutter={[16, 16]}>
+          <Col span={6}>
+            <Card size="small">
+              <div style={{ textAlign: 'center' }}>
+                <Typography.Title level={3} style={{ margin: 0 }}>
+                  {systemDefaultQuotas.max_collection_count}
+                </Typography.Title>
+                <Typography.Text type="secondary">
+                  {getQuotaTypeName('max_collection_count')}
+                </Typography.Text>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small">
+              <div style={{ textAlign: 'center' }}>
+                <Typography.Title level={3} style={{ margin: 0 }}>
+                  {systemDefaultQuotas.max_document_count}
+                </Typography.Title>
+                <Typography.Text type="secondary">
+                  {getQuotaTypeName('max_document_count')}
+                </Typography.Text>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small">
+              <div style={{ textAlign: 'center' }}>
+                <Typography.Title level={3} style={{ margin: 0 }}>
+                  {systemDefaultQuotas.max_document_count_per_collection}
+                </Typography.Title>
+                <Typography.Text type="secondary">
+                  {getQuotaTypeName('max_document_count_per_collection')}
+                </Typography.Text>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small">
+              <div style={{ textAlign: 'center' }}>
+                <Typography.Title level={3} style={{ margin: 0 }}>
+                  {systemDefaultQuotas.max_bot_count}
+                </Typography.Title>
+                <Typography.Text type="secondary">
+                  {getQuotaTypeName('max_bot_count')}
+                </Typography.Text>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      ) : (
+        <Typography.Text type="secondary">
+          <FormattedMessage id="quota.system_loading" />
+        </Typography.Text>
+      )}
+    </Card>
+  );
 
+  const renderUserQuotasTab = () => (
+    <>
       {isAdmin ? (
         <Table
           rowKey="user_id"
@@ -244,6 +388,37 @@ export default () => {
             />
           </Card>
         )
+      )}
+    </>
+  );
+
+  return (
+    <PageContainer>
+      <PageHeader
+        title={formatMessage({ id: 'quota.management' })}
+        description={formatMessage({ id: 'quota.management_tips' })}
+      >
+        <RefreshButton loading={loading} onClick={getQuotas} />
+      </PageHeader>
+
+      {isAdmin ? (
+        <Tabs
+          defaultActiveKey="user_quotas"
+          items={[
+            {
+              key: 'user_quotas',
+              label: formatMessage({ id: 'quota.user_quotas' }),
+              children: renderUserQuotasTab(),
+            },
+            {
+              key: 'system_defaults',
+              label: formatMessage({ id: 'quota.system_defaults' }),
+              children: renderSystemDefaultQuotasTab(),
+            },
+          ]}
+        />
+      ) : (
+        renderUserQuotasTab()
       )}
 
       <Modal
@@ -290,6 +465,78 @@ export default () => {
               min={0}
               style={{ width: '100%' }}
               placeholder={formatMessage({ id: 'quota.enter_new_limit' })}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={formatMessage({ id: 'quota.edit_system_defaults' })}
+        open={systemQuotasModalVisible}
+        onCancel={() => setSystemQuotasModalVisible(false)}
+        onOk={() => systemQuotasForm.submit()}
+        destroyOnClose
+        width={600}
+      >
+        <Form
+          form={systemQuotasForm}
+          layout="vertical"
+          onFinish={handleUpdateSystemQuotas}
+        >
+          <Form.Item
+            name="max_collection_count"
+            label={getQuotaTypeName('max_collection_count')}
+            rules={[
+              { required: true },
+              { type: 'number', min: 1 }
+            ]}
+          >
+            <InputNumber
+              min={1}
+              style={{ width: '100%' }}
+              placeholder={formatMessage({ id: 'quota.enter_default_limit' })}
+            />
+          </Form.Item>
+          <Form.Item
+            name="max_document_count"
+            label={getQuotaTypeName('max_document_count')}
+            rules={[
+              { required: true },
+              { type: 'number', min: 1 }
+            ]}
+          >
+            <InputNumber
+              min={1}
+              style={{ width: '100%' }}
+              placeholder={formatMessage({ id: 'quota.enter_default_limit' })}
+            />
+          </Form.Item>
+          <Form.Item
+            name="max_document_count_per_collection"
+            label={getQuotaTypeName('max_document_count_per_collection')}
+            rules={[
+              { required: true },
+              { type: 'number', min: 1 }
+            ]}
+          >
+            <InputNumber
+              min={1}
+              style={{ width: '100%' }}
+              placeholder={formatMessage({ id: 'quota.enter_default_limit' })}
+            />
+          </Form.Item>
+          <Form.Item
+            name="max_bot_count"
+            label={getQuotaTypeName('max_bot_count')}
+            rules={[
+              { required: true },
+              { type: 'number', min: 1 }
+            ]}
+          >
+            <InputNumber
+              min={1}
+              style={{ width: '100%' }}
+              placeholder={formatMessage({ id: 'quota.enter_default_limit' })}
             />
           </Form.Item>
         </Form>
