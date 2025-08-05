@@ -239,7 +239,7 @@ class DocumentService:
             from aperag.service.quota_service import quota_service
 
             # Check and consume quotas first within the transaction
-            await quota_service.check_and_consume_quota(user, "max_document_count", len(files))
+            await quota_service.check_and_consume_quota(user, "max_document_count", len(files), session)
             
             # Check per-collection quota by counting existing documents in this collection
             from sqlalchemy import select, func
@@ -389,7 +389,7 @@ class DocumentService:
         
         # Release quota within the same transaction
         from aperag.service.quota_service import quota_service
-        await quota_service.release_quota(user, "max_document_count", 1)
+        await quota_service.release_quota(user, "max_document_count", 1, session)
         
         await session.flush()
         logger.info(f"Successfully marked document {document.id} as deleted.")

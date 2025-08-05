@@ -76,7 +76,7 @@ class CollectionService:
             from aperag.service.quota_service import quota_service
             
             # Check and consume quota within the transaction
-            await quota_service.check_and_consume_quota(user, "max_collection_count", 1)
+            await quota_service.check_and_consume_quota(user, "max_collection_count", 1, session)
             
             # Create collection within the same transaction
             config_str = dumpCollectionConfig(collection_config) if collection.config is not None else None
@@ -278,7 +278,7 @@ class CollectionService:
             collection_to_delete.gmt_deleted = utc_now()
             
             # Release quota within the same transaction
-            await quota_service.release_quota(user, "max_collection_count", 1)
+            await quota_service.release_quota(user, "max_collection_count", 1, session)
             
             await session.flush()
             await session.refresh(collection_to_delete)

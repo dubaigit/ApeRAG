@@ -175,11 +175,17 @@ class QuotaService:
         
         return await self.db_ops.execute_with_transaction(_operation)
 
-    async def check_and_consume_quota(self, user_id: str, quota_type: str, amount: int = 1) -> None:
+    async def check_and_consume_quota(self, user_id: str, quota_type: str, amount: int = 1, session=None) -> None:
         """
         Check quota availability and consume it atomically.
         Raises QuotaExceededException if quota would be exceeded.
         This should be called within the same transaction as the resource creation.
+        
+        Args:
+            user_id: User ID
+            quota_type: Type of quota to check
+            amount: Amount to consume
+            session: Optional session to use. If None, creates a new transaction.
         """
         async def _operation(session):
             from aperag.db.models import UserQuota
@@ -211,12 +217,23 @@ class QuotaService:
             
             await session.flush()
         
-        return await self.db_ops.execute_with_transaction(_operation)
+        if session is not None:
+            # Use the provided session (within existing transaction)
+            return await _operation(session)
+        else:
+            # Create new transaction
+            return await self.db_ops.execute_with_transaction(_operation)
 
-    async def release_quota(self, user_id: str, quota_type: str, amount: int = 1) -> None:
+    async def release_quota(self, user_id: str, quota_type: str, amount: int = 1, session=None) -> None:
         """
         Release quota (decrease usage).
         This should be called within the same transaction as the resource deletion.
+        
+        Args:
+            user_id: User ID
+            quota_type: Type of quota to release
+            amount: Amount to release
+            session: Optional session to use. If None, creates a new transaction.
         """
         async def _operation(session):
             from aperag.db.models import UserQuota
@@ -237,7 +254,12 @@ class QuotaService:
                 quota.gmt_updated = utc_now()
                 await session.flush()
         
-        return await self.db_ops.execute_with_transaction(_operation)
+        if session is not None:
+            # Use the provided session (within existing transaction)
+            return await _operation(session)
+        else:
+            # Create new transaction
+            return await self.db_ops.execute_with_transaction(_operation)
 
     async def initialize_user_quotas(self, user_id: str) -> None:
         """Initialize default quotas for a new user."""

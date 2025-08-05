@@ -73,7 +73,7 @@ class BotService:
             from aperag.db.models import Bot, BotCollectionRelation, BotStatus
 
             # Check and consume quota within the transaction
-            await quota_service.check_and_consume_quota(user, "max_bot_count", 1)
+            await quota_service.check_and_consume_quota(user, "max_bot_count", 1, session)
 
             # Create bot in database directly using session
             bot = Bot(
@@ -285,7 +285,7 @@ class BotService:
             await session.flush()
 
             # Release quota within the transaction
-            await quota_service.release_quota(user, "max_bot_count", 1)
+            await quota_service.release_quota(user, "max_bot_count", 1, session)
 
             return bot_to_delete, collection_ids
 
