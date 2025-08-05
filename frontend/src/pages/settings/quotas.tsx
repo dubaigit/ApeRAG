@@ -78,6 +78,9 @@ export default () => {
     }
 
     setSearchLoading(true);
+    // Clear previous search result immediately when starting new search
+    setSearchedUserQuota(undefined);
+    
     try {
       // Search for user by username, email, or user ID
       const res = await quotasApi.quotasGet({ allUsers: true });
@@ -93,10 +96,12 @@ export default () => {
         setSearchedUserQuota(foundUser);
       } else {
         message.warning(formatMessage({ id: 'quota.user_not_found' }));
-        setSearchedUserQuota(undefined);
+        // Keep setSearchedUserQuota(undefined) - already cleared above
       }
     } catch (error) {
       message.error(formatMessage({ id: 'quota.search_error' }));
+      // Clear search result on error as well
+      setSearchedUserQuota(undefined);
     } finally {
       setSearchLoading(false);
     }
@@ -363,6 +368,11 @@ export default () => {
 
   const renderUserQuotasTab = () => {
     // Determine which user data to display
+    // If admin is searching and has search value but no search result, don't show any user
+    const shouldShowUser = isAdmin ? 
+      (searchValue ? !!searchedUserQuota : !!currentUserQuota) : 
+      !!currentUserQuota;
+    
     const displayUser = searchedUserQuota || currentUserQuota;
     const isSearchResult = !!searchedUserQuota;
 
@@ -392,7 +402,7 @@ export default () => {
                 onClick={clearSearch}
                 disabled={!searchValue}
               >
-                <FormattedMessage id="action.clear" />
+                清空
               </Button>
             </Space.Compact>
             {searchValue && (
@@ -407,65 +417,86 @@ export default () => {
         )}
 
         {/* User quota display */}
-        {displayUser && (
-          <Card 
-            title={
-              isSearchResult 
-                ? formatMessage({ id: 'quota.user_quotas_for' }, { username: displayUser.username })
-                : formatMessage({ id: 'quota.my_quotas' })
-            }
-            extra={
-              isAdmin && displayUser && (
-                <Space>
-                  <Button
-                    type="link"
-                    size="small"
-                    icon={<EditOutlined />}
-                    onClick={() => handleEditQuota(displayUser)}
-                  >
-                    <FormattedMessage id="action.edit" />
-                  </Button>
-                  <Button
-                    type="link"
-                    size="small"
-                    icon={<ReloadOutlined />}
-                    onClick={() => handleRecalculateUsage(displayUser.user_id)}
-                  >
-                    <FormattedMessage id="quota.recalculate" />
-                  </Button>
-                </Space>
-              )
-            }
-          >
-            {isSearchResult && (
-              <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-                <Typography.Text strong>
-                  <FormattedMessage id="user.username" />: {displayUser.username}
-                </Typography.Text>
-                <br />
-                <Typography.Text>
-                  <FormattedMessage id="user.email" />: {displayUser.email}
-                </Typography.Text>
-                <br />
-                <Typography.Text>
-                  <FormattedMessage id="user.role" />: {displayUser.role}
-                </Typography.Text>
-              </div>
-            )}
-            <Table
-              rowKey="quota_type"
-              bordered
-              columns={userQuotaColumns}
-              dataSource={displayUser.quotas}
-              loading={loading || searchLoading}
-              pagination={false}
-              size="middle"
-            />
-          </Card>
+        {shouldShowUser && displayUser && (
+          <div>
+            {/* User Information Card */}
+            <Card 
+              title="用户信息"
+              style={{ marginBottom: 16 }}
+            >
+              <Row gutter={[24, 16]}>
+                <Col span={6}>
+                  <div>
+                    <Typography.Text type="secondary">用户名</Typography.Text>
+                    <br />
+                    <Typography.Text strong>{displayUser.username}</Typography.Text>
+                  </div>
+                </Col>
+                <Col span={6}>
+                  <div>
+                    <Typography.Text type="secondary">用户ID</Typography.Text>
+                    <br />
+                    <Typography.Text strong>{displayUser.user_id}</Typography.Text>
+                  </div>
+                </Col>
+                <Col span={6}>
+                  <div>
+                    <Typography.Text type="secondary">邮箱</Typography.Text>
+                    <br />
+                    <Typography.Text strong>{displayUser.email || '未设置'}</Typography.Text>
+                  </div>
+                </Col>
+                <Col span={6}>
+                  <div>
+                    <Typography.Text type="secondary">角色</Typography.Text>
+                    <br />
+                    <Typography.Text strong>{displayUser.role}</Typography.Text>
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+
+            {/* Quota Information Card */}
+            <Card 
+              title="配额信息"
+              extra={
+                isAdmin && displayUser && (
+                  <Space>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => handleEditQuota(displayUser)}
+                    >
+                      <FormattedMessage id="action.edit" />
+                    </Button>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<ReloadOutlined />}
+                      onClick={() => handleRecalculateUsage(displayUser.user_id)}
+                    >
+                      <FormattedMessage id="quota.recalculate" />
+                    </Button>
+                  </Space>
+                )
+              }
+            >
+              <Table
+                rowKey="quota_type"
+                bordered
+                columns={userQuotaColumns}
+                dataSource={displayUser.quotas}
+                loading={loading || searchLoading}
+                pagination={false}
+                size="middle"
+              />
+            </Card>
+          </div>
         )}
 
         {/* No data state */}
-        {!displayUser && !loading && !searchLoading && (
+        {!shouldShowUser && !loading && !searchLoading && (
           <Card>
             <div style={{ textAlign: 'center', padding: 40 }}>
               <Typography.Text type="secondary">

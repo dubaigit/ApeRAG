@@ -153,10 +153,11 @@ class QuotaService:
             total_document_count = await session.scalar(stmt)
             usage_data['max_document_count'] = total_document_count
             
-            # Bot count
+            # Bot count (exclude system default bot)
             stmt = select(func.count()).select_from(Bot).where(
                 Bot.user == user_id,
-                Bot.gmt_deleted.is_(None)
+                Bot.gmt_deleted.is_(None),
+                Bot.title != "Default Agent Bot"  # Exclude system default bot
             )
             bot_count = await session.scalar(stmt)
             usage_data['max_bot_count'] = bot_count
